@@ -1,0 +1,1171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Brad Hanna | CRM v3</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+:root {
+  --bg:#0f0f0f; --surface:#181818; --surface2:#222; --surface3:#1d1d1d;
+  --border:#2a2a2a; --border2:#333;
+  --accent:#e8a020; --accent2:#c45c1a;
+  --green:#2ecc71; --yellow:#f39c12; --red:#e74c3c; --blue:#3498db;
+  --text:#e8e8e8; --muted:#666; --muted2:#999;
+  --fh:'Bebas Neue',sans-serif;
+  --fm:'IBM Plex Mono',monospace;
+  --fb:'IBM Plex Sans',sans-serif;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--fb);min-height:100vh}
+
+/* SETUP */
+#setup-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}
+.setup-card{background:var(--surface);border:1px solid var(--border);border-top:4px solid var(--accent);padding:40px;max-width:580px;width:100%}
+.setup-title{font-family:var(--fh);font-size:32px;letter-spacing:3px;color:var(--accent);margin-bottom:6px}
+.setup-sub{font-family:var(--fm);font-size:12px;color:var(--muted2);margin-bottom:28px}
+.setup-hint{font-size:11px;color:var(--muted2);font-family:var(--fm);margin-bottom:20px;line-height:1.9;background:var(--surface2);border-left:3px solid var(--accent);padding:14px}
+.setup-hint code{color:var(--accent)} .setup-hint strong{color:var(--text)}
+.setup-label{font-family:var(--fm);font-size:10px;letter-spacing:1px;color:var(--muted2);text-transform:uppercase;margin-bottom:6px}
+.setup-input{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:12px 14px;font-family:var(--fm);font-size:13px;outline:none;margin-bottom:16px}
+.setup-input:focus{border-color:var(--accent)}
+
+/* LOADING / TOAST */
+#loading-bar{position:fixed;top:0;left:0;height:3px;background:var(--accent);width:0%;transition:width .3s;z-index:9999}
+#toast{position:fixed;bottom:24px;right:24px;background:var(--surface);border:1px solid var(--accent);border-left:4px solid var(--accent);padding:14px 20px;font-family:var(--fm);font-size:12px;color:var(--accent);z-index:9999;transform:translateY(100px);opacity:0;transition:all .3s;max-width:320px}
+#toast.show{transform:translateY(0);opacity:1}
+
+/* HEADER */
+header{background:var(--surface);border-bottom:2px solid var(--accent);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;flex-wrap:wrap;gap:10px}
+.logo{font-family:var(--fh);font-size:26px;letter-spacing:3px;color:var(--accent)}
+.logo span{color:var(--text)}
+.header-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.stat-pill{background:var(--surface2);border:1px solid var(--border);padding:5px 11px;border-radius:20px;font-family:var(--fm);font-size:10px;display:flex;align-items:center;gap:6px}
+.dot{width:7px;height:7px;border-radius:50%}
+.icon-btn{font-family:var(--fm);font-size:10px;letter-spacing:1px;padding:6px 12px;border:1px solid var(--border);background:transparent;color:var(--muted2);cursor:pointer;text-transform:uppercase;transition:all .2s}
+.icon-btn:hover{border-color:var(--accent);color:var(--accent)}
+
+/* LAYOUT */
+.app-body{display:flex;height:calc(100vh - 58px)}
+
+/* SIDEBAR NAV */
+.sidebar{width:200px;min-width:200px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:16px 0}
+.nav-item{font-family:var(--fm);font-size:11px;letter-spacing:1px;text-transform:uppercase;padding:12px 20px;cursor:pointer;color:var(--muted2);border-left:3px solid transparent;transition:all .2s;display:flex;align-items:center;gap:10px}
+.nav-item:hover{color:var(--text);background:rgba(255,255,255,.03)}
+.nav-item.active{color:var(--accent);border-left-color:var(--accent);background:rgba(232,160,32,.05)}
+.nav-item.green-nav.active{color:var(--green);border-left-color:var(--green)}
+.nav-item.blue-nav.active{color:var(--blue);border-left-color:var(--blue)}
+.nav-divider{height:1px;background:var(--border);margin:10px 20px}
+.nav-label{font-family:var(--fm);font-size:9px;letter-spacing:2px;color:var(--muted);padding:8px 20px 4px;text-transform:uppercase}
+
+/* MAIN CONTENT */
+.main-content{flex:1;overflow-y:auto;padding:24px}
+
+/* PANELS */
+.panel{display:none}.panel.active{display:block}
+
+/* DASHBOARD */
+.dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:12px;margin-bottom:24px}
+.dash-card{background:var(--surface);border:1px solid var(--border);padding:16px;position:relative;overflow:hidden;cursor:default}
+.dash-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.c-accent::before{background:var(--accent)}.c-green::before{background:var(--green)}
+.c-yellow::before{background:var(--yellow)}.c-red::before{background:var(--red)}.c-blue::before{background:var(--blue)}
+.dash-label{font-family:var(--fm);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);margin-bottom:8px}
+.dash-number{font-family:var(--fh);font-size:40px;line-height:1}
+.dash-sub{font-size:10px;color:var(--muted2);margin-top:4px;font-family:var(--fm)}
+
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:800px){.two-col{grid-template-columns:1fr}}
+.col-title{font-family:var(--fh);font-size:17px;letter-spacing:2px;margin-bottom:12px}
+
+/* SECTION HEADERS */
+.section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.section-title{font-family:var(--fh);font-size:19px;letter-spacing:2px}
+.section-actions{display:flex;gap:8px;align-items:center}
+.badge{font-family:var(--fm);font-size:10px;padding:3px 10px;background:var(--surface2);border:1px solid var(--border)}
+
+/* FORMS */
+.form-card{background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--accent);padding:22px;margin-bottom:20px}
+.form-card.gt{border-top-color:var(--green)}
+.form-title{font-family:var(--fh);font-size:20px;letter-spacing:2px;color:var(--accent);margin-bottom:16px}
+.form-title.g{color:var(--green)}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:12px;margin-bottom:12px}
+.form-group{display:flex;flex-direction:column;gap:5px}
+label{font-family:var(--fm);font-size:9px;letter-spacing:1px;color:var(--muted2);text-transform:uppercase}
+input,select,textarea{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:9px 11px;font-family:var(--fb);font-size:13px;outline:none;transition:border-color .2s;width:100%}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+select option{background:var(--surface2)}
+textarea{resize:vertical}
+
+/* BUTTONS */
+.btn{font-family:var(--fm);font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:10px 20px;border:none;cursor:pointer;transition:all .2s}
+.btn-primary{background:var(--accent);color:#000}.btn-primary:hover{background:var(--accent2)}
+.btn-primary:disabled,.btn-green:disabled{opacity:.5;cursor:not-allowed}
+.btn-green{background:var(--green);color:#000}.btn-green:hover{background:#27ae60}
+.btn-small{font-family:var(--fm);font-size:9px;letter-spacing:1px;padding:5px 10px;border:1px solid var(--border);background:transparent;color:var(--muted2);cursor:pointer;text-transform:uppercase;transition:all .2s}
+.btn-small:hover{border-color:var(--accent);color:var(--accent)}
+.btn-danger{font-family:var(--fm);font-size:9px;padding:5px 10px;border:1px solid #333;background:transparent;color:#555;cursor:pointer;transition:all .2s}
+.btn-danger:hover{border-color:var(--red);color:var(--red)}
+.btn-ghost{font-family:var(--fm);font-size:10px;letter-spacing:1px;padding:9px 18px;border:1px solid var(--border);background:transparent;color:var(--muted2);cursor:pointer;text-transform:uppercase}
+
+/* TIERS */
+.tier{display:inline-block;font-family:var(--fm);font-size:9px;letter-spacing:1px;padding:3px 8px;border-radius:2px}
+.tier-1{background:rgba(46,204,113,.12);color:var(--green);border:1px solid rgba(46,204,113,.25)}
+.tier-2{background:rgba(243,156,18,.12);color:var(--yellow);border:1px solid rgba(243,156,18,.25)}
+.tier-3{background:rgba(231,76,60,.12);color:var(--red);border:1px solid rgba(231,76,60,.25)}
+.status-badge{display:inline-block;font-family:var(--fm);font-size:9px;letter-spacing:1px;padding:3px 8px;border-radius:2px}
+.s-active{background:rgba(46,204,113,.12);color:var(--green);border:1px solid rgba(46,204,113,.25)}
+.s-pending{background:rgba(243,156,18,.12);color:var(--yellow);border:1px solid rgba(243,156,18,.25)}
+.s-complete{background:rgba(100,100,100,.15);color:var(--muted2);border:1px solid #333}
+.s-lost{background:rgba(231,76,60,.12);color:var(--red);border:1px solid rgba(231,76,60,.25)}
+
+/* TABLE */
+.table-wrap{background:var(--surface);border:1px solid var(--border);overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+thead tr{background:var(--surface2);border-bottom:2px solid var(--border)}
+th{font-family:var(--fm);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);padding:10px 13px;text-align:left;white-space:nowrap}
+td{padding:11px 13px;border-bottom:1px solid var(--border);font-size:12px;vertical-align:middle}
+tr:hover td{background:rgba(255,255,255,.015)}
+.cell-name{font-weight:600;font-size:13px;cursor:pointer;color:var(--text);transition:color .2s}
+.cell-name:hover{color:var(--accent)}
+.cell-sub{font-size:10px;color:var(--muted2);font-family:var(--fm);margin-top:1px}
+.note-clip{font-size:11px;color:var(--muted2);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.actions{display:flex;gap:4px;flex-wrap:wrap}
+.days-badge{font-family:var(--fm);font-size:11px;font-weight:500}
+.dh{color:var(--green)}.dw{color:var(--yellow)}.dc{color:var(--red)}
+
+/* FILTERS */
+.filters{display:flex;gap:7px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.filter-btn{font-family:var(--fm);font-size:9px;letter-spacing:1px;padding:5px 12px;border:1px solid var(--border);background:transparent;color:var(--muted2);cursor:pointer;text-transform:uppercase;transition:all .2s}
+.filter-btn.active,.filter-btn:hover{border-color:var(--accent);color:var(--accent)}
+.search-box{flex:1;min-width:150px;max-width:260px}
+
+/* RE-ENGAGEMENT CARDS */
+.reeng-cards{display:flex;flex-direction:column;gap:8px}
+.reeng-card{background:var(--surface);border:1px solid var(--border);border-left:4px solid;padding:13px 16px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.rc-t1{border-left-color:var(--green)}.rc-t2{border-left-color:var(--yellow)}.rc-t3{border-left-color:var(--red)}
+.reeng-name{font-weight:600;font-size:13px;cursor:pointer;color:var(--text)}
+.reeng-name:hover{color:var(--accent)}
+.reeng-meta{font-family:var(--fm);font-size:10px;color:var(--muted2);margin-top:3px}
+.prompt-box{background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--accent);padding:11px 13px;margin-top:8px;font-size:11px;line-height:1.7;color:#bbb;font-family:var(--fm);white-space:pre-wrap;display:none}
+.prompt-box.open{display:block}
+.copy-btn{font-family:var(--fm);font-size:9px;letter-spacing:1px;padding:3px 9px;border:1px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer;margin-top:6px;text-transform:uppercase;transition:all .2s;display:inline-block}
+.copy-btn:hover{background:var(--accent);color:#000}
+
+/* ══════════════════════════════════════
+   CUSTOMER PROFILE PANEL
+══════════════════════════════════════ */
+#profile-panel{display:none;position:fixed;top:58px;right:0;width:520px;height:calc(100vh - 58px);background:var(--surface);border-left:2px solid var(--accent);overflow-y:auto;z-index:90;transform:translateX(100%);transition:transform .3s ease}
+#profile-panel.open{display:block;transform:translateX(0)}
+
+.profile-header{background:var(--surface2);border-bottom:1px solid var(--border);padding:20px 22px;position:sticky;top:0;z-index:10}
+.profile-close{position:absolute;top:16px;right:18px;font-family:var(--fm);font-size:11px;color:var(--muted2);cursor:pointer;padding:4px 8px;border:1px solid var(--border);background:transparent;transition:all .2s}
+.profile-close:hover{color:var(--red);border-color:var(--red)}
+.profile-name{font-family:var(--fh);font-size:28px;letter-spacing:2px;color:var(--accent);margin-bottom:2px}
+.profile-company{font-family:var(--fm);font-size:12px;color:var(--muted2)}
+
+.profile-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);margin:16px 22px}
+.pstat{background:var(--surface2);padding:14px 12px;text-align:center}
+.pstat-num{font-family:var(--fh);font-size:28px;line-height:1}
+.pstat-label{font-family:var(--fm);font-size:9px;letter-spacing:1px;color:var(--muted2);text-transform:uppercase;margin-top:4px}
+
+.profile-section{padding:16px 22px;border-bottom:1px solid var(--border)}
+.profile-section-title{font-family:var(--fh);font-size:16px;letter-spacing:2px;color:var(--muted2);margin-bottom:12px}
+
+.profile-info-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pinfo{display:flex;flex-direction:column;gap:3px}
+.pinfo-label{font-family:var(--fm);font-size:9px;letter-spacing:1px;color:var(--muted);text-transform:uppercase}
+.pinfo-val{font-size:13px;font-weight:500}
+
+/* Site cards in profile */
+.profile-site{background:var(--surface2);border:1px solid var(--border);border-left:3px solid;padding:12px 14px;margin-bottom:8px}
+.profile-site.s-a{border-left-color:var(--green)}
+.profile-site.s-p{border-left-color:var(--yellow)}
+.profile-site.s-c{border-left-color:var(--muted)}
+.profile-site.s-l{border-left-color:var(--red)}
+.ps-name{font-weight:600;font-size:13px;margin-bottom:4px}
+.ps-meta{font-family:var(--fm);font-size:10px;color:var(--muted2);margin-top:2px}
+.ps-equip{font-family:var(--fm);font-size:10px;color:var(--blue);margin-top:2px}
+.ps-value{font-family:var(--fm);font-size:10px;color:var(--green);margin-top:2px}
+.ps-actions{display:flex;gap:5px;margin-top:8px}
+
+/* Prompt in profile */
+.profile-prompt-box{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);padding:12px;margin-top:8px;font-size:11px;line-height:1.7;color:#bbb;font-family:var(--fm);white-space:pre-wrap;display:none}
+.profile-prompt-box.open{display:block}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:300;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--accent);padding:24px;width:90%;max-width:620px;max-height:90vh;overflow-y:auto}
+.modal-title{font-family:var(--fh);font-size:20px;letter-spacing:2px;color:var(--accent);margin-bottom:16px}
+.modal-title.g{color:var(--green)}
+.modal-actions{display:flex;gap:10px;margin-top:16px;justify-content:flex-end}
+
+/* EMPTY */
+.empty-state{text-align:center;padding:36px;color:var(--muted2);font-family:var(--fm);font-size:12px}
+.empty-icon{font-size:30px;margin-bottom:8px}
+
+/* ANIMATIONS */
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.pulse{animation:pulse 2s infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinning{display:inline-block;animation:spin 1s linear infinite}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+</style>
+</head>
+<body>
+
+<div id="loading-bar"></div>
+<div id="toast"></div>
+
+<!-- ═══════ SETUP ═══════ -->
+<div id="setup-screen">
+  <div class="setup-card">
+    <div class="setup-title">BRAD HANNA CRM</div>
+    <div class="setup-sub">v3 — Customers + Job Sites + Profiles</div>
+    <div class="setup-hint">
+      <strong>Step 1:</strong> Create a new Google Spreadsheet<br>
+      <strong>Step 2:</strong> Extensions → Apps Script → paste <code>google-apps-script-v3.js</code><br>
+      <strong>Step 3:</strong> Run → <code>setupSheets</code> and authorize<br>
+      <strong>Step 4:</strong> Deploy → New deployment → Web app → Anyone → Deploy<br>
+      <strong>Step 5:</strong> Paste your Web App URL below
+    </div>
+    <div class="setup-label">Google Apps Script Web App URL</div>
+    <input class="setup-input" type="text" id="sheet-url-input" placeholder="https://script.google.com/macros/s/YOUR_ID/exec">
+    <button class="btn btn-primary" onclick="saveUrl()" style="width:100%">CONNECT & LAUNCH →</button>
+  </div>
+</div>
+
+<!-- ═══════ MAIN APP ═══════ -->
+<div id="main-app" style="display:none">
+
+<header>
+  <div class="logo">BRAD <span>HANNA</span> // CRM <span style="font-size:14px;color:var(--muted2);letter-spacing:1px">v3</span></div>
+  <div class="header-right">
+    <div class="stat-pill"><div class="dot pulse" style="background:var(--green)"></div><span id="hdr-active">0</span></div>
+    <div class="stat-pill"><div class="dot" style="background:var(--yellow)"></div><span id="hdr-warm">0</span></div>
+    <div class="stat-pill"><div class="dot" style="background:var(--red)"></div><span id="hdr-cold">0</span></div>
+    <div class="stat-pill"><div class="dot" style="background:var(--blue)"></div><span id="hdr-sites">0 SITES</span></div>
+    <div class="stat-pill"><div class="dot" style="background:var(--accent)"></div><span id="hdr-revenue">$0/mo</span></div>
+    <button class="icon-btn" onclick="syncAll()" id="sync-btn">⟳ SYNC</button>
+    <button class="icon-btn" onclick="resetUrl()" style="font-size:9px">⚙</button>
+  </div>
+</header>
+
+<div class="app-body">
+
+  <!-- SIDEBAR -->
+  <nav class="sidebar">
+    <div class="nav-label">Overview</div>
+    <div class="nav-item active" onclick="showPanel('dashboard')">📊 Dashboard</div>
+    <div class="nav-divider"></div>
+    <div class="nav-label">Manage</div>
+    <div class="nav-item green-nav" onclick="showPanel('customers')">👷 Customers</div>
+    <div class="nav-item blue-nav" onclick="showPanel('jobsites')">🏗 Job Sites</div>
+    <div class="nav-divider"></div>
+    <div class="nav-label">Actions</div>
+    <div class="nav-item" onclick="showPanel('reengagement')">🔁 Re-Engage</div>
+    <div class="nav-item" onclick="showPanel('add-customer')">+ Customer</div>
+    <div class="nav-item" onclick="showPanel('add-site')">+ Job Site</div>
+  </nav>
+
+  <!-- MAIN CONTENT -->
+  <div class="main-content">
+
+    <!-- ══ DASHBOARD ══ -->
+    <div class="panel active" id="panel-dashboard">
+      <div class="dash-grid">
+        <div class="dash-card c-accent">
+          <div class="dash-label">Total Customers</div>
+          <div class="dash-number" id="d-total">0</div>
+          <div class="dash-sub">in your book</div>
+        </div>
+        <div class="dash-card c-green">
+          <div class="dash-label">🟢 Active</div>
+          <div class="dash-number" id="d-t1">0</div>
+          <div class="dash-sub">0–30 days</div>
+        </div>
+        <div class="dash-card c-yellow">
+          <div class="dash-label">🟡 Warm</div>
+          <div class="dash-number" id="d-t2">0</div>
+          <div class="dash-sub">30–90 days</div>
+        </div>
+        <div class="dash-card c-red">
+          <div class="dash-label">🔴 Cold</div>
+          <div class="dash-number" id="d-t3">0</div>
+          <div class="dash-sub">90+ days</div>
+        </div>
+        <div class="dash-card c-blue">
+          <div class="dash-label">Active Sites</div>
+          <div class="dash-number" id="d-sites">0</div>
+          <div class="dash-sub">running now</div>
+        </div>
+        <div class="dash-card c-accent">
+          <div class="dash-label">Monthly Revenue</div>
+          <div class="dash-number" id="d-rev" style="font-size:28px;margin-top:4px">$0</div>
+          <div class="dash-sub">active sites total</div>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div>
+          <div class="col-title" style="color:var(--red)">NEEDS ATTENTION</div>
+          <div id="dash-attention" class="reeng-cards">
+            <div class="empty-state"><div class="empty-icon">⟳</div>Loading...</div>
+          </div>
+        </div>
+        <div>
+          <div class="col-title" style="color:var(--blue)">ACTIVE JOB SITES</div>
+          <div id="dash-sites-list">
+            <div class="empty-state"><div class="empty-icon">⟳</div>Loading...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ CUSTOMERS ══ -->
+    <div class="panel" id="panel-customers">
+      <div class="section-head">
+        <div class="section-title" style="color:var(--green)">👷 CUSTOMERS</div>
+        <div class="section-actions">
+          <span class="badge" id="cust-count">0 customers</span>
+          <button class="btn btn-primary" onclick="showPanel('add-customer')">+ Add</button>
+        </div>
+      </div>
+      <div class="filters">
+        <button class="filter-btn active" onclick="filterC('all',this)">All</button>
+        <button class="filter-btn" onclick="filterC('1',this)">🟢 Active</button>
+        <button class="filter-btn" onclick="filterC('2',this)">🟡 Warm</button>
+        <button class="filter-btn" onclick="filterC('3',this)">🔴 Cold</button>
+        <input class="search-box" type="text" placeholder="Search..." oninput="searchC(this.value)">
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Customer</th><th>Equipment</th><th>Last Contact</th>
+            <th>Days</th><th>Tier</th><th>Sites</th><th>Total/Mo</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="c-tbody"><tr><td colspan="8" class="empty-state"><div class="empty-icon">⟳</div>Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══ JOB SITES ══ -->
+    <div class="panel" id="panel-jobsites">
+      <div class="section-head">
+        <div class="section-title" style="color:var(--blue)">🏗 JOB SITES</div>
+        <div class="section-actions">
+          <span class="badge" id="sites-count">0 sites</span>
+          <button class="btn btn-green" onclick="showPanel('add-site')">+ Add Site</button>
+        </div>
+      </div>
+      <div class="filters">
+        <button class="filter-btn active" onclick="filterS('all',this)">All</button>
+        <button class="filter-btn" onclick="filterS('Active',this)">🟢 Active</button>
+        <button class="filter-btn" onclick="filterS('Pending',this)">🟡 Pending</button>
+        <button class="filter-btn" onclick="filterS('Complete',this)">✓ Complete</button>
+        <button class="filter-btn" onclick="filterS('Lost',this)">✕ Lost</button>
+        <input class="search-box" type="text" placeholder="Search..." oninput="searchS(this.value)">
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Job Site</th><th>Customer</th><th>City</th><th>Superintendent</th>
+            <th>Equipment</th><th>Status</th><th>Value/Mo</th><th>Dates</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="s-tbody"><tr><td colspan="9" class="empty-state"><div class="empty-icon">⟳</div>Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══ RE-ENGAGEMENT ══ -->
+    <div class="panel" id="panel-reengagement">
+      <div class="section-head">
+        <div class="section-title" style="color:var(--yellow)">🔁 RE-ENGAGEMENT</div>
+      </div>
+      <div style="margin-bottom:24px">
+        <div style="font-family:var(--fh);font-size:17px;letter-spacing:2px;color:var(--yellow);margin-bottom:10px">TIER 2 — WARM (30–90 DAYS)</div>
+        <div id="re-t2" class="reeng-cards"><div class="empty-state">None right now.</div></div>
+      </div>
+      <div>
+        <div style="font-family:var(--fh);font-size:17px;letter-spacing:2px;color:var(--red);margin-bottom:10px">TIER 3 — COLD (90+ DAYS)</div>
+        <div id="re-t3" class="reeng-cards"><div class="empty-state">None right now.</div></div>
+      </div>
+    </div>
+
+    <!-- ══ ADD CUSTOMER ══ -->
+    <div class="panel" id="panel-add-customer">
+      <div class="form-card">
+        <div class="form-title">ADD NEW CUSTOMER</div>
+        <div class="form-grid">
+          <div class="form-group"><label>Name *</label><input type="text" id="f-name" placeholder="John Smith"></div>
+          <div class="form-group"><label>Company *</label><input type="text" id="f-company" placeholder="ABC Construction"></div>
+          <div class="form-group"><label>Phone</label><input type="text" id="f-phone" placeholder="(555) 000-0000"></div>
+          <div class="form-group"><label>Email</label><input type="text" id="f-email" placeholder="john@abc.com"></div>
+          <div class="form-group"><label>Equipment They Rent</label><input type="text" id="f-equip" placeholder="Excavators, lifts..."></div>
+          <div class="form-group"><label>Last Contact Date *</label><input type="date" id="f-date"></div>
+          <div class="form-group"><label>Project Type</label><input type="text" id="f-project" placeholder="Commercial, residential..."></div>
+          <div class="form-group"><label>Est. Monthly Value</label><input type="text" id="f-value" placeholder="$5,000"></div>
+        </div>
+        <div class="form-group" style="margin-bottom:14px"><label>Notes</label><textarea id="f-notes" rows="3" placeholder="What did you last discuss? Any upcoming projects?"></textarea></div>
+        <button class="btn btn-primary" id="add-c-btn" onclick="addClient()">ADD CUSTOMER →</button>
+      </div>
+    </div>
+
+    <!-- ══ ADD JOB SITE ══ -->
+    <div class="panel" id="panel-add-site">
+      <div class="form-card gt">
+        <div class="form-title g">ADD NEW JOB SITE</div>
+        <div class="form-grid">
+          <div class="form-group"><label>Site Name *</label><input type="text" id="s-name" placeholder="Downtown Hotel Project"></div>
+          <div class="form-group"><label>Customer * (select or type)</label>
+            <select id="s-clientId" onchange="fillClientName()">
+              <option value="">— Select Customer —</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Address</label><input type="text" id="s-address" placeholder="123 Main St"></div>
+          <div class="form-group"><label>City</label><input type="text" id="s-city" placeholder="Houston, TX"></div>
+          <div class="form-group"><label>Superintendent</label><input type="text" id="s-supe" placeholder="Mike Johnson"></div>
+          <div class="form-group"><label>Supe Phone</label><input type="text" id="s-supephone" placeholder="(555) 000-0000"></div>
+          <div class="form-group"><label>Equipment On Site</label><input type="text" id="s-equip" placeholder="Scissor lift, excavator..."></div>
+          <div class="form-group"><label>Est. Monthly Value</label><input type="text" id="s-value" placeholder="$8,000"></div>
+          <div class="form-group"><label>Start Date</label><input type="date" id="s-start"></div>
+          <div class="form-group"><label>End Date (est.)</label><input type="date" id="s-end"></div>
+          <div class="form-group"><label>Status</label>
+            <select id="s-status">
+              <option value="Active">Active</option>
+              <option value="Pending">Pending</option>
+              <option value="Complete">Complete</option>
+              <option value="Lost">Lost</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:14px"><label>Notes</label><textarea id="s-notes" rows="3" placeholder="Access details, equipment needs, key contacts..."></textarea></div>
+        <button class="btn btn-green" id="add-s-btn" onclick="addSite()">ADD JOB SITE →</button>
+      </div>
+    </div>
+
+  </div><!-- /main-content -->
+</div><!-- /app-body -->
+</div><!-- /main-app -->
+
+<!-- ═══════ CUSTOMER PROFILE PANEL ═══════ -->
+<div id="profile-panel">
+  <div class="profile-header">
+    <button class="profile-close" onclick="closeProfile()">✕ CLOSE</button>
+    <div class="profile-name" id="pp-name">—</div>
+    <div class="profile-company" id="pp-company">—</div>
+  </div>
+
+  <div class="profile-stats">
+    <div class="pstat">
+      <div class="pstat-num" id="pp-sites">0</div>
+      <div class="pstat-label">Total Sites</div>
+    </div>
+    <div class="pstat">
+      <div class="pstat-num" id="pp-active">0</div>
+      <div class="pstat-label">Active</div>
+    </div>
+    <div class="pstat">
+      <div class="pstat-num" id="pp-revenue" style="font-size:20px;padding-top:4px">$0</div>
+      <div class="pstat-label">Monthly</div>
+    </div>
+  </div>
+
+  <div class="profile-section">
+    <div class="profile-section-title">CONTACT INFO</div>
+    <div class="profile-info-grid">
+      <div class="pinfo"><div class="pinfo-label">Phone</div><div class="pinfo-val" id="pp-phone">—</div></div>
+      <div class="pinfo"><div class="pinfo-label">Email</div><div class="pinfo-val" id="pp-email" style="font-size:12px">—</div></div>
+      <div class="pinfo"><div class="pinfo-label">Last Contact</div><div class="pinfo-val" id="pp-last">—</div></div>
+      <div class="pinfo"><div class="pinfo-label">Status</div><div class="pinfo-val" id="pp-tier">—</div></div>
+      <div class="pinfo"><div class="pinfo-label">Equipment</div><div class="pinfo-val" id="pp-equip" style="font-size:12px">—</div></div>
+      <div class="pinfo"><div class="pinfo-label">Project Type</div><div class="pinfo-val" id="pp-project" style="font-size:12px">—</div></div>
+    </div>
+    <div style="margin-top:12px;font-size:12px;color:var(--muted2);font-family:var(--fm)" id="pp-notes"></div>
+  </div>
+
+  <div class="profile-section">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div class="profile-section-title">JOB SITES</div>
+      <button class="btn-small" onclick="quickAddSite()" id="pp-add-site-btn">+ Add Site</button>
+    </div>
+    <div id="pp-sites-list"><div class="empty-state" style="padding:20px">No job sites yet.</div></div>
+  </div>
+
+  <div class="profile-section">
+    <div class="profile-section-title">CLAUDE RE-ENGAGEMENT PROMPT</div>
+    <div style="font-size:11px;color:var(--muted2);font-family:var(--fm);margin-bottom:8px">Click to generate a prompt based on this customer's history</div>
+    <button class="btn-small" onclick="toggleProfilePrompt()">📋 Generate Prompt</button>
+    <div class="profile-prompt-box" id="pp-prompt"></div>
+    <button class="copy-btn" id="pp-copy-btn" onclick="copyProfilePrompt()" style="display:none;margin-top:6px">COPY TO CLAUDE</button>
+  </div>
+
+  <div class="profile-section" style="border-bottom:none">
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-primary" id="pp-touch-btn" onclick="touchFromProfile()">✓ Mark Contacted Today</button>
+      <button class="btn-small" id="pp-edit-btn" onclick="editFromProfile()">Edit Customer</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT CLIENT MODAL -->
+<div class="modal-overlay" id="ec-modal">
+  <div class="modal">
+    <div class="modal-title">EDIT CUSTOMER</div>
+    <input type="hidden" id="ec-id">
+    <div class="form-grid">
+      <div class="form-group"><label>Name</label><input type="text" id="ec-name"></div>
+      <div class="form-group"><label>Company</label><input type="text" id="ec-company"></div>
+      <div class="form-group"><label>Phone</label><input type="text" id="ec-phone"></div>
+      <div class="form-group"><label>Email</label><input type="text" id="ec-email"></div>
+      <div class="form-group"><label>Equipment</label><input type="text" id="ec-equip"></div>
+      <div class="form-group"><label>Last Contact</label><input type="date" id="ec-date"></div>
+      <div class="form-group"><label>Project Type</label><input type="text" id="ec-project"></div>
+      <div class="form-group"><label>Monthly Value</label><input type="text" id="ec-value"></div>
+    </div>
+    <div class="form-group" style="margin-top:10px"><label>Notes</label><textarea id="ec-notes" rows="3"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModals()">CANCEL</button>
+      <button class="btn btn-primary" id="ec-save-btn" onclick="saveClientEdit()">SAVE →</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT SITE MODAL -->
+<div class="modal-overlay" id="es-modal">
+  <div class="modal">
+    <div class="modal-title g" style="color:var(--green)">EDIT JOB SITE</div>
+    <input type="hidden" id="es-id">
+    <div class="form-grid">
+      <div class="form-group"><label>Site Name</label><input type="text" id="es-name"></div>
+      <div class="form-group"><label>Customer</label>
+        <select id="es-clientId" onchange="fillEditClientName()">
+          <option value="">— Select Customer —</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Address</label><input type="text" id="es-address"></div>
+      <div class="form-group"><label>City</label><input type="text" id="es-city"></div>
+      <div class="form-group"><label>Superintendent</label><input type="text" id="es-supe"></div>
+      <div class="form-group"><label>Supe Phone</label><input type="text" id="es-supephone"></div>
+      <div class="form-group"><label>Equipment</label><input type="text" id="es-equip"></div>
+      <div class="form-group"><label>Monthly Value</label><input type="text" id="es-value"></div>
+      <div class="form-group"><label>Start Date</label><input type="date" id="es-start"></div>
+      <div class="form-group"><label>End Date</label><input type="date" id="es-end"></div>
+      <div class="form-group"><label>Status</label>
+        <select id="es-status">
+          <option value="Active">Active</option>
+          <option value="Pending">Pending</option>
+          <option value="Complete">Complete</option>
+          <option value="Lost">Lost</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group" style="margin-top:10px"><label>Notes</label><textarea id="es-notes" rows="3"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModals()">CANCEL</button>
+      <button class="btn btn-green" id="es-save-btn" onclick="saveSiteEdit()">SAVE →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════
+let clients   = [];
+let jobsites  = [];
+let cFilter   = 'all', cSearch = '';
+let sFilter   = 'all', sSearch = '';
+let activeProfileId = null;
+let SHEET_URL = localStorage.getItem('brad_crm_v3_url') || 'https://script.google.com/macros/s/AKfycbz5aVd5EEGC6yfdMis2O9P_In0e94IQktmO-A-y4rODwQC4or6akvsf6GUti7zJVcTdmw/exec';
+
+if (SHEET_URL) launch();
+
+// ══════════════════════════════════════════════
+// SETUP
+// ══════════════════════════════════════════════
+function saveUrl() {
+  const url = document.getElementById('sheet-url-input').value.trim();
+  if (!url.startsWith('https://script.google.com')) { toast('Paste a valid Apps Script URL', true); return; }
+  localStorage.setItem('brad_crm_v3_url', url);
+  SHEET_URL = url;
+  launch();
+}
+
+function launch() {
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('main-app').style.display = 'block';
+  document.getElementById('f-date').value = today();
+  document.getElementById('s-start').value = today();
+  syncAll();
+}
+
+function resetUrl() { localStorage.removeItem('brad_crm_v3_url'); location.reload(); }
+function today()    { return new Date().toISOString().split('T')[0]; }
+
+// ══════════════════════════════════════════════
+// API
+// ══════════════════════════════════════════════
+function bar(on) {
+  const el = document.getElementById('loading-bar');
+  el.style.width = on ? '70%' : '100%';
+  if (!on) setTimeout(() => el.style.width = '0%', 400);
+}
+
+async function api(params) {
+  bar(true);
+  try {
+    let res;
+    if (params.action === 'getAll') {
+      res = await fetch(`${SHEET_URL}?action=getAll&type=${params.type}`);
+    } else {
+      res = await fetch(SHEET_URL, { method:'POST', body:JSON.stringify(params) });
+    }
+    const data = await res.json();
+    bar(false);
+    return data;
+  } catch(e) { bar(false); toast('Connection error', true); return null; }
+}
+
+async function syncAll() {
+  const btn = document.getElementById('sync-btn');
+  btn.innerHTML = '<span class="spinning">⟳</span> SYNCING';
+  const [cd, sd] = await Promise.all([
+    api({ action:'getAll', type:'clients' }),
+    api({ action:'getAll', type:'jobsites' })
+  ]);
+  btn.innerHTML = '⟳ SYNC';
+  if (cd && cd.records) clients  = cd.records.filter(r => r.id);
+  if (sd && sd.records) jobsites = sd.records.filter(r => r.id);
+  populateClientDropdowns();
+  renderAll();
+  if (activeProfileId) openProfile(activeProfileId); // refresh open profile
+  toast(`${clients.length} customers · ${jobsites.length} sites`);
+}
+
+// ══════════════════════════════════════════════
+// CLIENT CRUD
+// ══════════════════════════════════════════════
+async function addClient() {
+  const name = document.getElementById('f-name').value.trim();
+  const company = document.getElementById('f-company').value.trim();
+  const date = document.getElementById('f-date').value;
+  if (!name || !company || !date) { toast('Name, Company and Date are required', true); return; }
+  const btn = document.getElementById('add-c-btn');
+  btn.disabled = true; btn.textContent = 'SAVING...';
+  const record = {
+    name, company,
+    phone: document.getElementById('f-phone').value.trim(),
+    email: document.getElementById('f-email').value.trim(),
+    equip: document.getElementById('f-equip').value.trim(),
+    lastContact: date,
+    project: document.getElementById('f-project').value.trim(),
+    value: document.getElementById('f-value').value.trim(),
+    notes: document.getElementById('f-notes').value.trim()
+  };
+  const res = await api({ action:'add', type:'clients', record });
+  btn.disabled = false; btn.textContent = 'ADD CUSTOMER →';
+  if (res && res.success) {
+    toast('Customer added ✓');
+    ['f-name','f-company','f-phone','f-email','f-equip','f-project','f-value','f-notes'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('f-date').value = today();
+    await syncAll();
+    showPanel('customers');
+  }
+}
+
+async function touchClient(id) {
+  const res = await api({ action:'touch', type:'clients', id });
+  if (res && res.success) { toast('Marked as contacted today ✓'); await syncAll(); }
+}
+
+async function deleteClient(id) {
+  if (!confirm('Remove this customer? Their job sites will remain but become unlinked.')) return;
+  const res = await api({ action:'delete', type:'clients', id });
+  if (res && res.success) { toast('Customer removed ✓'); closeProfile(); await syncAll(); }
+}
+
+function openEditClient(id) {
+  const c = clients.find(c => c.id == id);
+  if (!c) return;
+  document.getElementById('ec-id').value = c.id || '';
+  document.getElementById('ec-name').value = c.name || '';
+  document.getElementById('ec-company').value = c.company || '';
+  document.getElementById('ec-phone').value = c.phone || '';
+  document.getElementById('ec-email').value = c.email || '';
+  document.getElementById('ec-equip').value = c.equip || '';
+  document.getElementById('ec-date').value = c.lastContact || '';
+  document.getElementById('ec-project').value = c.project || '';
+  document.getElementById('ec-value').value = c.value || '';
+  document.getElementById('ec-notes').value = c.notes || '';
+  document.getElementById('ec-modal').classList.add('open');
+}
+
+async function saveClientEdit() {
+  const id = document.getElementById('ec-id').value;
+  const btn = document.getElementById('ec-save-btn');
+  btn.disabled = true; btn.textContent = 'SAVING...';
+  const record = {
+    id,
+    name: document.getElementById('ec-name').value.trim(),
+    company: document.getElementById('ec-company').value.trim(),
+    phone: document.getElementById('ec-phone').value.trim(),
+    email: document.getElementById('ec-email').value.trim(),
+    equip: document.getElementById('ec-equip').value.trim(),
+    lastContact: document.getElementById('ec-date').value,
+    project: document.getElementById('ec-project').value.trim(),
+    value: document.getElementById('ec-value').value.trim(),
+    notes: document.getElementById('ec-notes').value.trim()
+  };
+  const res = await api({ action:'update', type:'clients', record });
+  btn.disabled = false; btn.textContent = 'SAVE →';
+  if (res && res.success) { toast('Customer updated ✓'); closeModals(); await syncAll(); }
+}
+
+// ══════════════════════════════════════════════
+// JOB SITE CRUD
+// ══════════════════════════════════════════════
+async function addSite() {
+  const name = document.getElementById('s-name').value.trim();
+  const clientId = document.getElementById('s-clientId').value;
+  if (!name || !clientId) { toast('Site Name and Customer are required', true); return; }
+  const c = clients.find(c => c.id == clientId);
+  const btn = document.getElementById('add-s-btn');
+  btn.disabled = true; btn.textContent = 'SAVING...';
+  const record = {
+    siteName: name, clientId,
+    client: c ? `${c.name} — ${c.company}` : '',
+    address: document.getElementById('s-address').value.trim(),
+    city: document.getElementById('s-city').value.trim(),
+    superintendent: document.getElementById('s-supe').value.trim(),
+    supePhone: document.getElementById('s-supephone').value.trim(),
+    equipOnSite: document.getElementById('s-equip').value.trim(),
+    monthlyValue: document.getElementById('s-value').value.trim(),
+    startDate: document.getElementById('s-start').value,
+    endDate: document.getElementById('s-end').value,
+    status: document.getElementById('s-status').value,
+    notes: document.getElementById('s-notes').value.trim()
+  };
+  const res = await api({ action:'add', type:'jobsites', record });
+  btn.disabled = false; btn.textContent = 'ADD JOB SITE →';
+  if (res && res.success) {
+    toast('Job site added ✓');
+    ['s-name','s-address','s-city','s-supe','s-supephone','s-equip','s-value','s-end','s-notes'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('s-clientId').value = '';
+    document.getElementById('s-start').value = today();
+    document.getElementById('s-status').value = 'Active';
+    await syncAll();
+    showPanel('jobsites');
+  }
+}
+
+async function deleteSite(id) {
+  if (!confirm('Remove this job site?')) return;
+  const res = await api({ action:'delete', type:'jobsites', id });
+  if (res && res.success) { toast('Site removed ✓'); await syncAll(); }
+}
+
+function openEditSite(id) {
+  const s = jobsites.find(s => s.id == id);
+  if (!s) return;
+  document.getElementById('es-id').value = s.id || '';
+  document.getElementById('es-name').value = s.siteName || '';
+  document.getElementById('es-clientId').value = s.clientId || '';
+  document.getElementById('es-address').value = s.address || '';
+  document.getElementById('es-city').value = s.city || '';
+  document.getElementById('es-supe').value = s.superintendent || '';
+  document.getElementById('es-supephone').value = s.supePhone || '';
+  document.getElementById('es-equip').value = s.equipOnSite || '';
+  document.getElementById('es-value').value = s.monthlyValue || '';
+  document.getElementById('es-start').value = s.startDate || '';
+  document.getElementById('es-end').value = s.endDate || '';
+  document.getElementById('es-status').value = s.status || 'Active';
+  document.getElementById('es-notes').value = s.notes || '';
+  document.getElementById('es-modal').classList.add('open');
+}
+
+async function saveSiteEdit() {
+  const id = document.getElementById('es-id').value;
+  const clientId = document.getElementById('es-clientId').value;
+  const c = clients.find(c => c.id == clientId);
+  const btn = document.getElementById('es-save-btn');
+  btn.disabled = true; btn.textContent = 'SAVING...';
+  const record = {
+    id, clientId,
+    client: c ? `${c.name} — ${c.company}` : document.getElementById('es-name').value,
+    siteName: document.getElementById('es-name').value.trim(),
+    address: document.getElementById('es-address').value.trim(),
+    city: document.getElementById('es-city').value.trim(),
+    superintendent: document.getElementById('es-supe').value.trim(),
+    supePhone: document.getElementById('es-supephone').value.trim(),
+    equipOnSite: document.getElementById('es-equip').value.trim(),
+    monthlyValue: document.getElementById('es-value').value.trim(),
+    startDate: document.getElementById('es-start').value,
+    endDate: document.getElementById('es-end').value,
+    status: document.getElementById('es-status').value,
+    notes: document.getElementById('es-notes').value.trim()
+  };
+  const res = await api({ action:'update', type:'jobsites', record });
+  btn.disabled = false; btn.textContent = 'SAVE →';
+  if (res && res.success) { toast('Site updated ✓'); closeModals(); await syncAll(); }
+}
+
+function closeModals() {
+  document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open'));
+}
+
+// ══════════════════════════════════════════════
+// CUSTOMER PROFILE
+// ══════════════════════════════════════════════
+function openProfile(id) {
+  const c = clients.find(c => c.id == id);
+  if (!c) return;
+  activeProfileId = id;
+
+  const days  = daysSince(c.lastContact);
+  const tier  = getTier(days);
+  const sites = jobsites.filter(s => s.clientId == id);
+  const activeSites = sites.filter(s => s.status === 'Active');
+  const totalRev = sites.filter(s => s.status === 'Active').reduce((sum, s) => {
+    const v = parseFloat((s.monthlyValue||'').replace(/[^0-9.]/g,'')) || 0;
+    return sum + v;
+  }, 0);
+
+  document.getElementById('pp-name').textContent    = c.name;
+  document.getElementById('pp-company').textContent = c.company;
+  document.getElementById('pp-phone').textContent   = c.phone || '—';
+  document.getElementById('pp-email').textContent   = c.email || '—';
+  document.getElementById('pp-equip').textContent   = c.equip || '—';
+  document.getElementById('pp-project').textContent = c.project || '—';
+  document.getElementById('pp-last').textContent    = c.lastContact ? `${c.lastContact} (${days}d ago)` : '—';
+  document.getElementById('pp-tier').innerHTML      = tierLabel(tier);
+  document.getElementById('pp-notes').textContent   = c.notes || '';
+  document.getElementById('pp-sites').textContent   = sites.length;
+  document.getElementById('pp-active').textContent  = activeSites.length;
+  document.getElementById('pp-revenue').textContent = totalRev > 0 ? '$' + totalRev.toLocaleString() : '$0';
+  document.getElementById('pp-touch-btn').onclick   = () => touchClient(id);
+  document.getElementById('pp-edit-btn').onclick    = () => openEditClient(id);
+  document.getElementById('pp-add-site-btn').onclick = () => quickAddSite(id);
+
+  // Reset prompt
+  document.getElementById('pp-prompt').classList.remove('open');
+  document.getElementById('pp-copy-btn').style.display = 'none';
+  document.getElementById('pp-prompt').textContent = buildPrompt(c, tier);
+
+  // Sites list
+  const sitesList = document.getElementById('pp-sites-list');
+  if (!sites.length) {
+    sitesList.innerHTML = '<div class="empty-state" style="padding:20px;font-size:11px">No job sites yet.<br><br><button class="btn-small" onclick="quickAddSite()">+ Add First Site</button></div>';
+  } else {
+    const statusMap = { Active:'s-a', Pending:'s-p', Complete:'s-c', Lost:'s-l' };
+    sitesList.innerHTML = sites.map(s => `
+      <div class="profile-site ${statusMap[s.status]||'s-c'}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div class="ps-name">${s.siteName}</div>
+          ${statusBadge(s.status)}
+        </div>
+        ${s.city ? `<div class="ps-meta">📍 ${s.address ? s.address+', ' : ''}${s.city}</div>` : ''}
+        ${s.superintendent ? `<div class="ps-meta">👤 ${s.superintendent}${s.supePhone?' · '+s.supePhone:''}</div>` : ''}
+        ${s.equipOnSite ? `<div class="ps-equip">🔧 ${s.equipOnSite}</div>` : ''}
+        ${s.monthlyValue ? `<div class="ps-value">💰 ${s.monthlyValue}/mo</div>` : ''}
+        ${s.startDate ? `<div class="ps-meta">📅 ${s.startDate}${s.endDate?' → '+s.endDate:''}</div>` : ''}
+        ${s.notes ? `<div class="ps-meta" style="margin-top:4px;color:var(--muted2)">${s.notes}</div>` : ''}
+        <div class="ps-actions">
+          <button class="btn-small" onclick="openEditSite('${s.id}')">Edit</button>
+          <button class="btn-danger" onclick="deleteSite('${s.id}')">✕ Remove</button>
+        </div>
+      </div>`).join('');
+  }
+
+  document.getElementById('profile-panel').classList.add('open');
+}
+
+function closeProfile() {
+  document.getElementById('profile-panel').classList.remove('open');
+  activeProfileId = null;
+}
+
+function quickAddSite(prefilledId) {
+  const id = prefilledId || activeProfileId;
+  if (id) document.getElementById('s-clientId').value = id;
+  closeProfile();
+  showPanel('add-site');
+}
+
+function toggleProfilePrompt() {
+  const box = document.getElementById('pp-prompt');
+  const btn = document.getElementById('pp-copy-btn');
+  box.classList.toggle('open');
+  btn.style.display = box.classList.contains('open') ? 'inline-block' : 'none';
+}
+
+function copyProfilePrompt() {
+  const text = document.getElementById('pp-prompt').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('pp-copy-btn');
+    btn.textContent = 'COPIED!';
+    setTimeout(() => btn.textContent = 'COPY TO CLAUDE', 1500);
+  });
+}
+
+function touchFromProfile() {
+  if (activeProfileId) touchClient(activeProfileId);
+}
+
+function editFromProfile() {
+  if (activeProfileId) openEditClient(activeProfileId);
+}
+
+// ══════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════
+function daysSince(d) { return d ? Math.floor((new Date() - new Date(d)) / 86400000) : 999; }
+function getTier(days) { return days <= 30 ? 1 : days <= 90 ? 2 : 3; }
+function tierLabel(t) {
+  const m = {1:['tier-1','🟢 ACTIVE'],2:['tier-2','🟡 WARM'],3:['tier-3','🔴 COLD']};
+  return `<span class="tier ${m[t][0]}">${m[t][1]}</span>`;
+}
+function dClass(d) { return d<=30?'dh':d<=90?'dw':'dc'; }
+
+function statusBadge(s) {
+  const m = {Active:'s-active',Pending:'s-pending',Complete:'s-complete',Lost:'s-lost'};
+  return `<span class="status-badge ${m[s]||'s-complete'}">${s||'—'}</span>`;
+}
+
+function clientSites(id)  { return jobsites.filter(s => s.clientId == id); }
+function clientRevenue(id) {
+  return clientSites(id)
+    .filter(s => s.status === 'Active')
+    .reduce((sum,s) => sum + (parseFloat((s.monthlyValue||'').replace(/[^0-9.]/g,''))||0), 0);
+}
+
+function buildPrompt(c, tier) {
+  const days  = daysSince(c.lastContact);
+  const sites = clientSites(c.id);
+  const active = sites.filter(s => s.status === 'Active');
+  const siteInfo = active.length
+    ? `They currently have ${active.length} active job site(s): ${active.map(s=>s.siteName).join(', ')}.`
+    : 'No currently active job sites.';
+
+  if (tier === 2) return `I'm an outside sales rep in construction equipment rental with 20 years in the industry.\n\nWrite a short, personal text message to re-engage this client:\n- Name: ${c.name}\n- Company: ${c.company}\n- Equipment they rent: ${c.equip||'construction equipment'}\n- Last contact: ${days} days ago\n- ${siteInfo}\n- Notes: ${c.notes||'none'}\n\nPersonal, no pitch. Just open a conversation. Sign as Brad Hanna.`;
+
+  return `I'm an outside sales rep in construction equipment rental with 20 years in the industry.\n\nWrite a re-engagement email for a client I haven't contacted in ${days} days:\n- Name: ${c.name}\n- Company: ${c.company}\n- Equipment: ${c.equip||'construction equipment'}\n- Project type: ${c.project||'construction'}\n- ${siteInfo}\n- Last conversation: ${c.notes||'not recorded'}\n\nPersonal, reference history, give them a reason to respond. No discounts. Sign as Brad Hanna.`;
+}
+
+function populateClientDropdowns() {
+  const opts = ['<option value="">— Select Customer —</option>',
+    ...clients.map(c => `<option value="${c.id}">${c.name} — ${c.company}</option>`)
+  ].join('');
+  document.getElementById('s-clientId').innerHTML = opts;
+  document.getElementById('es-clientId').innerHTML = opts;
+}
+
+function fillClientName() {}
+function fillEditClientName() {}
+
+function togglePrompt(id) { document.getElementById('prompt-'+id).classList.toggle('open'); }
+function copyPrompt(id) {
+  const text = document.getElementById('prompt-'+id).innerText.replace('COPY TO CLAUDE','').trim();
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copybtn-'+id);
+    btn.textContent = 'COPIED!';
+    setTimeout(() => btn.textContent = 'COPY TO CLAUDE', 1500);
+  });
+}
+
+// ══════════════════════════════════════════════
+// RENDER
+// ══════════════════════════════════════════════
+function renderAll() {
+  const t1 = clients.filter(c => getTier(daysSince(c.lastContact)) === 1);
+  const t2 = clients.filter(c => getTier(daysSince(c.lastContact)) === 2);
+  const t3 = clients.filter(c => getTier(daysSince(c.lastContact)) === 3);
+  const activeSites = jobsites.filter(s => s.status === 'Active');
+  const totalRev = activeSites.reduce((sum,s) => sum + (parseFloat((s.monthlyValue||'').replace(/[^0-9.]/g,''))||0), 0);
+
+  // Header
+  document.getElementById('hdr-active').textContent  = `${t1.length} ACTIVE`;
+  document.getElementById('hdr-warm').textContent    = `${t2.length} WARM`;
+  document.getElementById('hdr-cold').textContent    = `${t3.length} COLD`;
+  document.getElementById('hdr-sites').textContent   = `${activeSites.length} SITES`;
+  document.getElementById('hdr-revenue').textContent = `$${totalRev.toLocaleString()}/mo`;
+
+  // Dash cards
+  document.getElementById('d-total').textContent = clients.length;
+  document.getElementById('d-t1').textContent    = t1.length;
+  document.getElementById('d-t2').textContent    = t2.length;
+  document.getElementById('d-t3').textContent    = t3.length;
+  document.getElementById('d-sites').textContent = activeSites.length;
+  document.getElementById('d-rev').textContent   = '$' + totalRev.toLocaleString();
+
+  // Counts
+  document.getElementById('cust-count').textContent  = `${clients.length} customers`;
+  document.getElementById('sites-count').textContent = `${jobsites.length} sites`;
+
+  // Dashboard attention
+  const attention = [...t3,...t2].slice(0,4);
+  document.getElementById('dash-attention').innerHTML = attention.length
+    ? attention.map(c => reengCard(c, getTier(daysSince(c.lastContact)))).join('')
+    : '<div class="empty-state"><div class="empty-icon">✅</div>All customers active.</div>';
+
+  // Dashboard sites
+  document.getElementById('dash-sites-list').innerHTML = activeSites.length
+    ? activeSites.slice(0,5).map(s => dashSiteCard(s)).join('')
+    : '<div class="empty-state"><div class="empty-icon">🏗</div>No active sites yet.</div>';
+
+  // Re-engagement
+  document.getElementById('re-t2').innerHTML = t2.length ? t2.map(c => reengCard(c,2)).join('') : '<div class="empty-state">None right now.</div>';
+  document.getElementById('re-t3').innerHTML = t3.length ? t3.map(c => reengCard(c,3)).join('') : '<div class="empty-state">None right now.</div>';
+
+  renderClientTable();
+  renderSiteTable();
+}
+
+function reengCard(c, tier) {
+  const days = daysSince(c.lastContact);
+  const color = tier===2?'var(--yellow)':'var(--red)';
+  const sites = clientSites(c.id);
+  const siteInfo = sites.length ? `${sites.filter(s=>s.status==='Active').length} active site(s)` : 'no sites';
+  return `<div class="reeng-card rc-t${tier}">
+    <div style="flex:1;min-width:160px">
+      <div class="reeng-name" onclick="openProfile('${c.id}')">${c.name}</div>
+      <div class="reeng-meta">${c.company} · ${siteInfo}</div>
+      <div class="reeng-meta" style="color:${color}">Silent ${days} days</div>
+      <div class="prompt-box" id="prompt-${c.id}">${buildPrompt(c,tier)}<br><button class="copy-btn" id="copybtn-${c.id}" onclick="copyPrompt('${c.id}')">COPY TO CLAUDE</button></div>
+    </div>
+    <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:2px">
+      <button class="btn-small" onclick="openProfile('${c.id}')">👤 Profile</button>
+      <button class="btn-small" onclick="touchClient('${c.id}')">✓ Contacted</button>
+      <button class="btn-small" onclick="togglePrompt('${c.id}')">📋</button>
+    </div>
+  </div>`;
+}
+
+function dashSiteCard(s) {
+  const c = clients.find(c => c.id == s.clientId);
+  return `<div style="background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--blue);padding:10px 13px;margin-bottom:6px">
+    <div style="font-weight:600;font-size:13px">${s.siteName}</div>
+    <div style="font-family:var(--fm);font-size:10px;color:var(--muted2);margin-top:2px">${c?c.name+' — ':''} ${s.city||''}</div>
+    ${s.equipOnSite?`<div style="font-family:var(--fm);font-size:10px;color:var(--blue);margin-top:2px">${s.equipOnSite}</div>`:''}
+    ${s.monthlyValue?`<div style="font-family:var(--fm);font-size:10px;color:var(--green);margin-top:2px">${s.monthlyValue}/mo</div>`:''}
+  </div>`;
+}
+
+function renderClientTable() {
+  let data = [...clients];
+  if (cFilter !== 'all') data = data.filter(c => getTier(daysSince(c.lastContact)) === parseInt(cFilter));
+  if (cSearch) { const q = cSearch.toLowerCase(); data = data.filter(c => (c.name||'').toLowerCase().includes(q)||(c.company||'').toLowerCase().includes(q)); }
+  data.sort((a,b) => daysSince(b.lastContact) - daysSince(a.lastContact));
+
+  const tbody = document.getElementById('c-tbody');
+  if (!data.length) { tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><div class="empty-icon">👷</div>No customers found.</td></tr>'; return; }
+
+  tbody.innerHTML = data.map(c => {
+    const days = daysSince(c.lastContact);
+    const tier = getTier(days);
+    const sites = clientSites(c.id);
+    const rev = clientRevenue(c.id);
+    return `<tr>
+      <td>
+        <div class="cell-name" onclick="openProfile('${c.id}')">${c.name}</div>
+        <div class="cell-sub">${c.company}</div>
+        ${c.phone?`<div class="cell-sub">${c.phone}</div>`:''}
+      </td>
+      <td style="font-size:11px">${c.equip||'—'}</td>
+      <td style="font-family:var(--fm);font-size:11px">${c.lastContact||'—'}</td>
+      <td><span class="days-badge ${dClass(days)}">${days}d</span></td>
+      <td>${tierLabel(tier)}</td>
+      <td style="font-family:var(--fm);font-size:11px;text-align:center">
+        <span style="color:${sites.length?'var(--blue)':'var(--muted2)'}">${sites.length}</span>
+        ${sites.filter(s=>s.status==='Active').length?`<span style="color:var(--green);font-size:9px"> (${sites.filter(s=>s.status==='Active').length} active)</span>`:''}
+      </td>
+      <td style="font-family:var(--fm);font-size:11px;color:${rev>0?'var(--green)':'var(--muted2)'}">${rev>0?'$'+rev.toLocaleString()+'/mo':'—'}</td>
+      <td><div class="actions">
+        <button class="btn-small" onclick="openProfile('${c.id}')">👤 Profile</button>
+        <button class="btn-small" onclick="touchClient('${c.id}')">✓</button>
+        <button class="btn-small" onclick="openEditClient('${c.id}')">Edit</button>
+        <button class="btn-danger" onclick="deleteClient('${c.id}')">✕</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderSiteTable() {
+  let data = [...jobsites];
+  if (sFilter !== 'all') data = data.filter(s => s.status === sFilter);
+  if (sSearch) { const q = sSearch.toLowerCase(); data = data.filter(s => (s.siteName||'').toLowerCase().includes(q)||(s.client||'').toLowerCase().includes(q)); }
+
+  const tbody = document.getElementById('s-tbody');
+  if (!data.length) { tbody.innerHTML = '<tr><td colspan="9" class="empty-state"><div class="empty-icon">🏗</div>No sites found.</td></tr>'; return; }
+
+  tbody.innerHTML = data.map(s => {
+    const c = clients.find(c => c.id == s.clientId);
+    return `<tr>
+      <td><div class="cell-name" style="cursor:default">${s.siteName}</div>${s.city?`<div class="cell-sub">${s.city}</div>`:''}</td>
+      <td>${c?`<div class="cell-name" onclick="openProfile('${c.id}')" style="font-size:12px">${c.name}</div><div class="cell-sub">${c.company}</div>`:`<span style="color:var(--muted2);font-size:11px">${s.client||'—'}</span>`}</td>
+      <td style="font-size:11px;font-family:var(--fm)">${s.address||'—'}</td>
+      <td><div style="font-size:12px;font-weight:500">${s.superintendent||'—'}</div>${s.supePhone?`<div class="cell-sub">${s.supePhone}</div>`:''}</td>
+      <td style="font-size:11px">${s.equipOnSite||'—'}</td>
+      <td>${statusBadge(s.status)}</td>
+      <td style="font-family:var(--fm);font-size:11px;color:var(--green)">${s.monthlyValue||'—'}</td>
+      <td style="font-family:var(--fm);font-size:10px;white-space:nowrap">${s.startDate||'—'}${s.endDate?'<br>→ '+s.endDate:''}</td>
+      <td><div class="actions">
+        <button class="btn-small" onclick="openEditSite('${s.id}')">Edit</button>
+        <button class="btn-danger" onclick="deleteSite('${s.id}')">✕</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════════
+function showPanel(id) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-'+id).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach((n,i) => {
+    const panels = ['dashboard','customers','jobsites','reengagement','add-customer','add-site'];
+    n.classList.toggle('active', panels[i] === id);
+  });
+  if (id !== 'dashboard' && id !== 'customers' && id !== 'jobsites') closeProfile();
+}
+
+function filterC(f, btn) {
+  cFilter = f;
+  document.querySelectorAll('#panel-customers .filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderClientTable();
+}
+
+function searchC(v) { cSearch = v; renderClientTable(); }
+
+function filterS(f, btn) {
+  sFilter = f;
+  document.querySelectorAll('#panel-jobsites .filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderSiteTable();
+}
+
+function searchS(v) { sSearch = v; renderSiteTable(); }
+
+// ══════════════════════════════════════════════
+// TOAST
+// ══════════════════════════════════════════════
+function toast(msg, err) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.borderColor = err ? 'var(--red)' : 'var(--accent)';
+  el.style.color = err ? 'var(--red)' : 'var(--accent)';
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>
