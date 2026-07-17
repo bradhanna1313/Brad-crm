@@ -2795,40 +2795,60 @@ let sFilter   = 'all', sSearch = '';
 let activeProfileId = null;
 const GMAPS_API_KEY = 'AIzaSyCnii1FQsurUfZk3VX69uMDXeFha50MyYk';
 let gmapsLoaded=false, gmapsLoading=false;
+let gmapsFailed=false;
 function loadGoogleMaps(){
-  if(gmapsLoaded) return Promise.resolve();
-  if(gmapsLoading) return new Promise(r=>{const t=setInterval(()=>{if(gmapsLoaded){clearInterval(t);r();}},100);});
+  if(gmapsLoaded) return Promise.resolve(true);
+  if(gmapsFailed) return Promise.resolve(false);
+  if(gmapsLoading) return new Promise(r=>{const t=setInterval(()=>{if(gmapsLoaded){clearInterval(t);r(true);} if(gmapsFailed){clearInterval(t);r(false);}},100);});
   gmapsLoading=true;
   return new Promise(r=>{
-    window._gmapsReady=()=>{gmapsLoaded=true;gmapsLoading=false;r();};
+    window._gmapsReady=()=>{
+      gmapsLoaded=true; gmapsLoading=false;
+      // A domain-restricted or invalid key can still call the success callback
+      // but leave window.google.maps.places unusable — verify it actually works.
+      if(!(window.google && window.google.maps && window.google.maps.places)){ gmapsFailed=true; gmapsLoaded=false; r(false); return; }
+      r(true);
+    };
     const s=document.createElement('script');
-    s.onerror=()=>{ gmapsLoading=false; console.error('Google Maps failed to load — check API key, billing, and that Maps JavaScript API + Places API are enabled.'); };
+    s.onerror=()=>{ gmapsLoading=false; gmapsFailed=true; console.error('Google Maps failed to load — check API key restrictions include this domain (bradhanna1313.github.io), billing, and that Maps JavaScript API + Places API are enabled.'); r(false); };
     s.src=`https://maps.googleapis.com/maps/api/js?key=${GMAPS_API_KEY}&libraries=places&callback=_gmapsReady`;
     document.head.appendChild(s);
+    setTimeout(()=>{ if(!gmapsLoaded && !gmapsFailed){ gmapsFailed=true; gmapsLoading=false; r(false); } }, 8000);
   });
 }
+window.addEventListener('error', function(e){
+  // Google injects a page-level error for domain/referrer/key problems (e.g. RefererNotAllowedMapError).
+  // Catch it so it can never block or "lock" the rest of the page/inputs.
+  if(e && e.message && /google|gmap|RefererNotAllowed|ApiNotActivated|InvalidKey/i.test(e.message)){ gmapsFailed=true; }
+}, true);
 function attachAutocomplete(inputId, cityId, stateId, zipId){
-  if(!gmapsLoaded||!window.google) return;
+  if(!gmapsLoaded||!window.google||!window.google.maps||!window.google.maps.places) return;
   const input=document.getElementById(inputId);
-  if(!input||input._ac) return; input._ac=true;
-  // tapping a pre-filled address selects all so typing replaces it & re-triggers suggestions
-  input.addEventListener('focus',function(){ const el=this; if(el.value) setTimeout(()=>{ try{ el.select(); }catch(e){} },50); });
-  const ac=new google.maps.places.Autocomplete(input,{componentRestrictions:{country:'us'},fields:['formatted_address','address_components']});
-  ac.addListener('place_changed',()=>{
-    const pl=ac.getPlace(); if(!pl.address_components) return;
-    const comp=(type,short)=>{const c=pl.address_components.find(c=>c.types.includes(type));return c?(short?c.short_name:c.long_name):'';};
-    const streetNum=comp('street_number'), route=comp('route');
-    const street=[streetNum,route].filter(Boolean).join(' ');
-    const city=comp('locality')||comp('sublocality')||comp('administrative_area_level_2');
-    const state=comp('administrative_area_level_1',true);
-    const zip=comp('postal_code');
-    const setVal=(id,v)=>{if(id&&v){const el=document.getElementById(id);if(el)el.value=v;}};
-    // put just the street into the address field (cleaner than full formatted)
-    if(street) input.value=street;
-    if(cityId){ const el=document.getElementById(cityId); if(el) el.value = city || el.value; }
-    setVal(stateId,state);
-    setVal(zipId,zip);
-  });
+  if(!input||input._ac) return;
+  try{
+    const ac=new google.maps.places.Autocomplete(input,{componentRestrictions:{country:'us'},fields:['formatted_address','address_components']});
+    input._ac=true; // only mark as attached once construction actually succeeds
+    ac.addListener('place_changed',()=>{
+      try{
+        const pl=ac.getPlace(); if(!pl.address_components) return;
+        const comp=(type,short)=>{const c=pl.address_components.find(c=>c.types.includes(type));return c?(short?c.short_name:c.long_name):'';};
+        const streetNum=comp('street_number'), route=comp('route');
+        const street=[streetNum,route].filter(Boolean).join(' ');
+        const city=comp('locality')||comp('sublocality')||comp('administrative_area_level_2');
+        const state=comp('administrative_area_level_1',true);
+        const zip=comp('postal_code');
+        const setVal=(id,v)=>{if(id&&v){const el=document.getElementById(id);if(el)el.value=v;}};
+        if(street) input.value=street;
+        if(cityId){ const el=document.getElementById(cityId); if(el) el.value = city || el.value; }
+        setVal(stateId,state);
+        setVal(zipId,zip);
+      }catch(e){ /* never let a places response break the field */ }
+    });
+  }catch(e){
+    // Construction failed (bad key, domain restriction, etc.) — field stays a
+    // completely normal, fully-typeable plain input. Nothing else happens.
+    console.error('Address autocomplete unavailable for '+inputId+':', e);
+  }
 }
 var _vtInterval=null;
 function _vtKey(){ return 'siteboss_active_visit'; }
@@ -2929,8 +2949,8 @@ async function stopVisitTimer(){
   }catch(e){ toast('Saved time but log failed',true); }
 }
 function initMapAutocomplete(prefix){
-  loadGoogleMaps().then(()=>{
-    // [address, city, state, zip]
+  loadGoogleMaps().then((ok)=>{
+    if(!ok) return; // failed to load / key or domain problem — fields stay plain, nothing breaks
     const sets=[
       ['s-address','s-city','s-state','s-zip'],
       ['es-address','es-city','es-state','es-zip'],
