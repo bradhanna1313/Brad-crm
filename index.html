@@ -2810,11 +2810,11 @@ function loadGoogleMaps(){
       gmapsLoaded=true; gmapsLoading=false;
       // A domain-restricted or invalid key can still call the success callback
       // but leave window.google.maps.places unusable — verify it actually works.
-      if(!(window.google && window.google.maps && window.google.maps.places)){ gmapsFailed=true; gmapsLoaded=false; r(false); return; }
+      if(!(window.google && window.google.maps && window.google.maps.places)){ gmapsFailed=true; gmapsLoaded=false; console.error('Google Maps loaded but places library unavailable — likely an invalid key or domain not authorized.'); if(typeof toast==='function') toast('Address suggestions unavailable — key/domain issue',true); r(false); return; }
       r(true);
     };
     const s=document.createElement('script');
-    s.onerror=()=>{ gmapsLoading=false; gmapsFailed=true; console.error('Google Maps failed to load — check API key restrictions include this domain (bradhanna1313.github.io), billing, and that Maps JavaScript API + Places API are enabled.'); r(false); };
+    s.onerror=()=>{ gmapsLoading=false; gmapsFailed=true; console.error('Google Maps script failed to load.'); if(typeof toast==='function') toast('Address suggestions: Maps script failed to load — check network/key',true); r(false); };
     s.src=`https://maps.googleapis.com/maps/api/js?key=${GMAPS_API_KEY}&libraries=places&callback=_gmapsReady`;
     document.head.appendChild(s);
     setTimeout(()=>{ if(!gmapsLoaded && !gmapsFailed){ gmapsFailed=true; gmapsLoading=false; r(false); } }, 8000);
@@ -2883,7 +2883,11 @@ function attachAutocomplete(inputId, cityId, stateId, zipId){
         lastQuery=q;
         try{
           window._acService.getPlacePredictions({input:q, componentRestrictions:{country:'us'}}, (predictions, status)=>{
-            if(status!=='OK'||!predictions){ closeBox(); return; }
+            if(status!=='OK'||!predictions){
+              closeBox();
+              if(status && status!=='ZERO_RESULTS' && !window._acWarned){ window._acWarned=true; console.error('Places prediction status:', status); if(typeof toast==='function') toast('Address suggestions error: '+status,true); }
+              return;
+            }
             renderBox(predictions);
           });
         }catch(e){ closeBox(); }
