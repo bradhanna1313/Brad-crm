@@ -387,6 +387,10 @@ tr:hover td{background:rgba(255,255,255,.015)}
 
 /* Google Places autocomplete dropdown must sit above modals (z-index 10001+) */
 .pac-container { z-index: 100000 !important; }
+.ac-suggest-box{position:absolute;z-index:100000;background:var(--surface2,#1c1f26);border:1px solid var(--border,#333);border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.35);max-height:220px;overflow-y:auto;font-family:var(--fm,monospace)}
+.ac-suggest-item{padding:10px 12px;font-size:13px;color:var(--text,#eee);cursor:pointer;border-bottom:1px solid var(--border,#2a2a2a)}
+.ac-suggest-item:last-child{border-bottom:none}
+.ac-suggest-item:hover,.ac-suggest-item.ac-active{background:var(--surface,#252a33)}
 body.field-mode .nav-advanced{display:none !important}
 </style>
 </head>
@@ -2826,27 +2830,71 @@ function attachAutocomplete(inputId, cityId, stateId, zipId){
   const input=document.getElementById(inputId);
   if(!input||input._ac) return;
   try{
-    const ac=new google.maps.places.Autocomplete(input,{componentRestrictions:{country:'us'},fields:['formatted_address','address_components']});
-    input._ac=true; // only mark as attached once construction actually succeeds
-    ac.addListener('place_changed',()=>{
+    if(!window._acService) window._acService = new google.maps.places.AutocompleteService();
+    if(!window._acPlacesDiv){ window._acPlacesDiv = document.createElement('div'); window._acPlacesService = new google.maps.places.PlacesService(window._acPlacesDiv); }
+    input._ac = true;
+    let box=null, items=[], activeIdx=-1, debounceT=null, lastQuery='';
+    function closeBox(){ if(box){ box.remove(); box=null; } items=[]; activeIdx=-1; }
+    function positionBox(){
+      if(!box) return;
+      const r=input.getBoundingClientRect();
+      box.style.left=(r.left+window.scrollX)+'px';
+      box.style.top=(r.bottom+window.scrollY+4)+'px';
+      box.style.width=Math.max(r.width,220)+'px';
+    }
+    function renderBox(predictions){
+      closeBox();
+      if(!predictions||!predictions.length) return;
+      box=document.createElement('div'); box.className='ac-suggest-box';
+      predictions.forEach((p,i)=>{
+        const row=document.createElement('div'); row.className='ac-suggest-item'; row.textContent=p.description;
+        // mousedown fires before the input's blur, so the click always registers
+        row.addEventListener('mousedown', (e)=>{ e.preventDefault(); selectPrediction(p); });
+        row.addEventListener('touchstart', (e)=>{ e.preventDefault(); selectPrediction(p); }, {passive:false});
+        box.appendChild(row);
+      });
+      document.body.appendChild(box);
+      positionBox();
+    }
+    function selectPrediction(p){
       try{
-        const pl=ac.getPlace(); if(!pl.address_components) return;
-        const comp=(type,short)=>{const c=pl.address_components.find(c=>c.types.includes(type));return c?(short?c.short_name:c.long_name):'';};
-        const streetNum=comp('street_number'), route=comp('route');
-        const street=[streetNum,route].filter(Boolean).join(' ');
-        const city=comp('locality')||comp('sublocality')||comp('administrative_area_level_2');
-        const state=comp('administrative_area_level_1',true);
-        const zip=comp('postal_code');
-        const setVal=(id,v)=>{if(id&&v){const el=document.getElementById(id);if(el)el.value=v;}};
-        if(street) input.value=street;
-        if(cityId){ const el=document.getElementById(cityId); if(el) el.value = city || el.value; }
-        setVal(stateId,state);
-        setVal(zipId,zip);
-      }catch(e){ /* never let a places response break the field */ }
+        window._acPlacesService.getDetails({placeId:p.place_id, fields:['address_components']}, (place, status)=>{
+          closeBox();
+          if(status!=='OK'||!place||!place.address_components){ input.value=p.description; return; }
+          const comp=(type,short)=>{const c=place.address_components.find(c=>c.types.includes(type));return c?(short?c.short_name:c.long_name):'';};
+          const streetNum=comp('street_number'), route=comp('route');
+          const street=[streetNum,route].filter(Boolean).join(' ');
+          const city=comp('locality')||comp('sublocality')||comp('administrative_area_level_2');
+          const state=comp('administrative_area_level_1',true);
+          const zip=comp('postal_code');
+          const setVal=(id,v)=>{if(id&&v){const el=document.getElementById(id);if(el)el.value=v;}};
+          input.value = street || p.description;
+          if(cityId){ const el=document.getElementById(cityId); if(el) el.value = city || el.value; }
+          setVal(stateId,state);
+          setVal(zipId,zip);
+        });
+      }catch(e){ input.value=p.description; closeBox(); }
+    }
+    input.addEventListener('input', function(){
+      const q=this.value.trim();
+      clearTimeout(debounceT);
+      if(q.length<3 || q===lastQuery){ if(q.length<3) closeBox(); return; }
+      debounceT=setTimeout(()=>{
+        lastQuery=q;
+        try{
+          window._acService.getPlacePredictions({input:q, componentRestrictions:{country:'us'}}, (predictions, status)=>{
+            if(status!=='OK'||!predictions){ closeBox(); return; }
+            renderBox(predictions);
+          });
+        }catch(e){ closeBox(); }
+      },250);
     });
+    input.addEventListener('blur', function(){ setTimeout(closeBox, 150); });
+    window.addEventListener('resize', positionBox);
+    window.addEventListener('scroll', positionBox, true);
   }catch(e){
-    // Construction failed (bad key, domain restriction, etc.) — field stays a
-    // completely normal, fully-typeable plain input. Nothing else happens.
+    // Construction failed for any reason — field stays a completely normal,
+    // fully-typeable plain input. Nothing else happens.
     console.error('Address autocomplete unavailable for '+inputId+':', e);
   }
 }
