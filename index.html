@@ -2817,7 +2817,7 @@ function loadGoogleMaps(){
     s.onerror=()=>{ gmapsLoading=false; gmapsFailed=true; console.error('Google Maps script failed to load.'); if(typeof toast==='function') toast('Address suggestions: Maps script failed to load — check network/key',true); r(false); };
     s.src=`https://maps.googleapis.com/maps/api/js?key=${GMAPS_API_KEY}&libraries=places&callback=_gmapsReady`;
     document.head.appendChild(s);
-    setTimeout(()=>{ if(!gmapsLoaded && !gmapsFailed){ gmapsFailed=true; gmapsLoading=false; r(false); } }, 8000);
+    setTimeout(()=>{ if(!gmapsLoaded && !gmapsFailed){ gmapsFailed=true; gmapsLoading=false; console.error('Google Maps script loaded but never called back after 8s — almost always means the API key\'s domain restrictions do not include this site (bradhanna1313.github.io).'); if(typeof toast==='function') toast('Address suggestions off: this site isn\'t in the Maps API key\'s allowed domains',true); r(false); } }, 8000);
   });
 }
 window.addEventListener('error', function(e){
