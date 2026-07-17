@@ -415,7 +415,7 @@ body.field-mode .nav-advanced{display:none !important}
 <div id="setup-screen">
   <div class="setup-card">
     <div class="setup-title">BRAD HANNA CRM</div>
-    <div class="setup-sub">v3 — Build: Jul 15a (address autocomplete rebuild)</div>
+    <div class="setup-sub">v3 — Build: Jul 15b (autocomplete safety net)</div>
     <div class="setup-hint">
       <strong>Step 1:</strong> Create a new Google Spreadsheet<br>
       <strong>Step 2:</strong> Extensions → Apps Script → paste <code>google-apps-script-v3.js</code><br>
@@ -530,7 +530,7 @@ body.field-mode .nav-advanced{display:none !important}
 
     <!-- ══ DASHBOARD ══ -->
     <div class="panel active" id="panel-dashboard">
-      <div style="font-family:var(--fm);font-size:9px;color:var(--muted2);text-align:right;margin-bottom:4px">Build: Jul 15a · address autocomplete rebuild</div>
+      <div style="font-family:var(--fm);font-size:9px;color:var(--muted2);text-align:right;margin-bottom:4px">Build: Jul 15b · autocomplete safety net</div>
       <!-- QUICK ACTIONS -->
       <div style="margin-bottom:20px">
         <div style="font-family:var(--fh);font-size:13px;letter-spacing:2px;color:var(--muted2);margin-bottom:10px">QUICK ADD</div>
@@ -3000,22 +3000,34 @@ async function stopVisitTimer(){
     else if(v.kind==='prospect'){ const p2=(prospects||[]).find(x=>x.id==v.id); if(p2) afterProspectOffer(p2, entryNote); }
   }catch(e){ toast('Saved time but log failed',true); }
 }
+const ADDRESS_FIELD_SETS=[
+  ['s-address','s-city','s-state','s-zip'],
+  ['es-address','es-city','es-state','es-zip'],
+  ['p-address','p-city',null,null],
+  ['ep-address','ep-city',null,null],
+  ['qs-address','qs-city',null,null],
+  ['f-address','f-city','f-state','f-zip'],
+  ['ec-address','ec-city','ec-state','ec-zip'],
+  ['qc-address','qc-city','qc-state','qc-zip']
+];
 function initMapAutocomplete(prefix){
-  loadGoogleMaps().then((ok)=>{
-    if(!ok) return; // failed to load / key or domain problem — fields stay plain, nothing breaks
-    const sets=[
-      ['s-address','s-city','s-state','s-zip'],
-      ['es-address','es-city','es-state','es-zip'],
-      ['p-address','p-city',null,null],
-      ['ep-address','ep-city',null,null],
-      ['qs-address','qs-city',null,null],
-      ['f-address','f-city','f-state','f-zip'],
-      ['ec-address','ec-city','ec-state','ec-zip'],
-      ['qc-address','qc-city','qc-state','qc-zip']
-    ];
-    sets.forEach(([a,c,st,z])=>attachAutocomplete(a,c,st,z));
-  });
+  try{
+    loadGoogleMaps().then((ok)=>{
+      if(!ok) return; // failed to load / key or domain problem — fields stay plain, nothing breaks
+      ADDRESS_FIELD_SETS.forEach(([a,c,st,z])=>attachAutocomplete(a,c,st,z));
+    });
+  }catch(e){ console.error('initMapAutocomplete failed:', e); }
 }
+// Safety net: independent of any single screen's code path (so a throw earlier in
+// whatever opened the form can never silently prevent autocomplete from attaching),
+// periodically scan for any visible address field that isn't wired up yet.
+setInterval(function(){
+  if(!gmapsLoaded) return;
+  ADDRESS_FIELD_SETS.forEach(([a,c,st,z])=>{
+    const el=document.getElementById(a);
+    if(el && !el._ac && el.offsetParent!==null){ try{ attachAutocomplete(a,c,st,z); }catch(e){} }
+  });
+}, 1500);
 function trWeekKey(){
   const d=new Date(); d.setHours(0,0,0,0);
   const monday=new Date(d); monday.setDate(d.getDate()-((d.getDay()+6)%7));
@@ -3318,6 +3330,7 @@ let SHEET_URL = localStorage.getItem('brad_crm_v3_url') || 'https://script.googl
 document.addEventListener('DOMContentLoaded', function() {
   showVisitTimer();
   applyFieldMode();
+  loadGoogleMaps().catch(()=>{}); // kick off the Maps script load once, unconditionally, so address autocomplete never depends on any single screen's code path succeeding
   const setup = document.getElementById('setup-screen');
   if (setup) setup.style.display = 'none';
   const app = document.getElementById('main-app');
