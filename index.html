@@ -2812,7 +2812,7 @@ function attachAutocomplete(inputId, cityId, stateId, zipId){
   const input=document.getElementById(inputId);
   if(!input||input._ac) return; input._ac=true;
   // tapping a pre-filled address selects all so typing replaces it & re-triggers suggestions
-  input.addEventListener('focus',function(){ if(this.value) this.select(); });
+  input.addEventListener('focus',function(){ const el=this; if(el.value) setTimeout(()=>{ try{ el.select(); }catch(e){} },50); });
   const ac=new google.maps.places.Autocomplete(input,{componentRestrictions:{country:'us'},fields:['formatted_address','address_components']});
   ac.addListener('place_changed',()=>{
     const pl=ac.getPlace(); if(!pl.address_components) return;
