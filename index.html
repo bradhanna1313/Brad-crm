@@ -387,6 +387,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
 
 /* Google Places autocomplete dropdown must sit above modals (z-index 10001+) */
 .pac-container { z-index: 100000 !important; }
+body.field-mode .nav-advanced{display:none !important}
 </style>
 </head>
 <body>
@@ -477,6 +478,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
 
   <!-- SIDEBAR -->
   <nav class="sidebar">
+    <button onclick="toggleFieldMode()" style="width:100%;margin-bottom:12px;padding:9px;border-radius:6px;border:1px solid var(--accent);background:var(--surface2);color:var(--accent);font-family:var(--fh);font-size:11px;letter-spacing:1px;cursor:pointer" id="field-mode-btn">📱 FIELD MODE</button>
     <div class="nav-label">Overview</div>
     <div class="nav-item active" onclick="showPanel('dashboard')">📊 Dashboard</div>
     <div class="nav-divider"></div>
@@ -485,7 +487,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
     <div class="nav-item blue-nav" onclick="showPanel('jobsites')">🏗 Job Sites</div>
     <div class="nav-divider"></div>
     <div class="nav-label">Actions</div>
-    <div class="nav-item" onclick="showPanel('reengagement')">🔁 Re-Engage</div>
+    <div class="nav-item nav-advanced" onclick="showPanel('reengagement')">🔁 Re-Engage</div>
     <div class="nav-item" onclick="showPanel('add-customer')">+ Customer</div>
     <div class="nav-item" onclick="showPanel('add-site')">+ Job Site</div>
     <div class="nav-divider"></div>
@@ -499,24 +501,24 @@ tr:hover td{background:rgba(255,255,255,.015)}
     <div class="nav-divider"></div>
     <div class="nav-label">Daily</div>
     <div class="nav-item" onclick="showPanel('followups')">⏰ Follow-Ups</div>
-    <div class="nav-item" onclick="showPanel('ar')">💵 AR / Invoices</div>
+    <div class="nav-item nav-advanced" onclick="showPanel('ar')">💵 AR / Invoices</div>
     <div class="nav-item" onclick="showPanel('tasks')">✅ To-Do List</div>
-    <div class="nav-item" onclick="showPanel('visits')">🚗 Visit Schedule</div>
-    <div class="nav-item" onclick="showPanel('revenue')">📈 Revenue</div>
-    <div class="nav-item" onclick="showPanel('activity')">📋 Activity Report</div>
-    <div class="nav-item" onclick="showPanel('plaud')">📝 Plaud Notes</div>
-    <div class="nav-item" onclick="showPanel('stories')">📖 Story Capture</div>
-    <div class="nav-item" onclick="showPanel('digest-setup')">☀️ Morning Digest</div>
-    <div class="nav-item" onclick="showPanel('branch-contacts');renderBranchContacts()">📧 Branch Contacts</div>
-    <div class="nav-item" onclick="showPanel('worktypes')">🔧 Work Types</div>
-    <div class="nav-item" onclick="showPanel('templates')">✉️ Email Templates</div>
-    <div class="nav-item" onclick="showPanel('servicelog')">🔧 Service Log</div>
-    <div class="nav-item" onclick="showPanel('equipment')">🔧 Equipment on Rent</div>
-    <div class="nav-divider"></div>
-    <div class="nav-label">Intelligence</div>
-    <div class="nav-item" onclick="showPanel('relationships')">⭐ Top Relationships</div>
-    <div class="nav-item" onclick="showPanel('competitors')">⚔ Competitors</div>
-    <div class="nav-item" onclick="showPanel('lostrentals')">📉 Lost Rentals</div>
+    <div class="nav-item nav-advanced" onclick="showPanel('visits')">🚗 Visit Schedule</div>
+    <div class="nav-item nav-advanced" onclick="showPanel('revenue')">📈 Revenue</div>
+    <div class="nav-item nav-advanced" onclick="showPanel('activity')">📋 Activity Report</div>
+    <div class="nav-item nav-advanced" onclick="showPanel('plaud')">📝 Plaud Notes</div>
+    <div class="nav-item nav-advanced" onclick="showPanel('stories')">📖 Story Capture</div>
+    <div class="nav-item nav-advanced" onclick="showPanel('digest-setup')">☀️ Morning Digest</div>
+    <div class="nav-item nav-advanced" onclick="showPanel('branch-contacts');renderBranchContacts()">📧 Branch Contacts</div>
+    <div class="nav-item nav-advanced" onclick="showPanel('worktypes')">🔧 Work Types</div>
+    <div class="nav-item nav-advanced" onclick="showPanel('templates')">✉️ Email Templates</div>
+    <div class="nav-item nav-advanced" onclick="showPanel('servicelog')">🔧 Service Log</div>
+    <div class="nav-item nav-advanced" onclick="showPanel('equipment')">🔧 Equipment on Rent</div>
+    <div class="nav-divider nav-advanced"></div>
+    <div class="nav-label nav-advanced">Intelligence</div>
+    <div class="nav-item nav-advanced" onclick="showPanel('relationships')">⭐ Top Relationships</div>
+    <div class="nav-item nav-advanced" onclick="showPanel('competitors')">⚔ Competitors</div>
+    <div class="nav-item nav-advanced" onclick="showPanel('lostrentals')">📉 Lost Rentals</div>
   </nav>
 
   <!-- MAIN CONTENT -->
@@ -856,7 +858,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
           <div class="form-group"><label>Sub 10 Company</label><input type="text" list="customer-companies" id="s-sub10company" placeholder="Type or pick company"></div>
           <div class="form-group"><label>Equipment On Site</label><input type="text" id="s-equip" placeholder="Scissor lift, excavator..."></div>
           <div class="form-group"><label>Est. Monthly Value</label><input type="text" id="s-value" placeholder="$8,000"></div>
-          <div class="form-group"><label>Zone</label><select id="s-zone"><option value="">— Day / Zone —</option><option value="Monday">Monday</option><option value="Tuesday">Tuesday</option><option value="Wednesday">Wednesday</option><option value="Thursday">Thursday</option><option value="Friday">Friday</option><option value="Tulsa">🌆 Tulsa</option></select></div>
+          <div class="form-group"><label>Zone</label><select id="s-zone"><option value="">— Day / Zone —</option><option value="Monday">Monday</option><option value="Tuesday">Tuesday</option><option value="Wednesday">Wednesday</option><option value="Thursday">Thursday</option><option value="Friday">Friday</option><option value="Tulsa">🌆 Tulsa</option><option value="Out of Territory">📍 Out of Territory</option></select></div>
           <div class="form-group"><label>Start Date</label><input type="date" id="s-start"></div>
           <div class="form-group"><label>End Date (est.)</label><input type="date" id="s-end"></div>
           <div class="form-group"><label>Status</label>
@@ -2731,7 +2733,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
       <div class="form-group"><label>Sub 14 Work Type</label><input type="text" id="es-sub14worktype" list="worktype-list" placeholder="Type or pick work type"></div>
       <div class="form-group"><label>Equipment</label><input type="text" id="es-equip"></div>
       <div class="form-group"><label>Monthly Value</label><input type="text" id="es-value"></div>
-      <div class="form-group"><label>Zone</label><select id="es-zone"><option value="">— Day / Zone —</option><option value="Monday">Monday</option><option value="Tuesday">Tuesday</option><option value="Wednesday">Wednesday</option><option value="Thursday">Thursday</option><option value="Friday">Friday</option><option value="Tulsa">🌆 Tulsa</option></select></div>
+      <div class="form-group"><label>Zone</label><select id="es-zone"><option value="">— Day / Zone —</option><option value="Monday">Monday</option><option value="Tuesday">Tuesday</option><option value="Wednesday">Wednesday</option><option value="Thursday">Thursday</option><option value="Friday">Friday</option><option value="Tulsa">🌆 Tulsa</option><option value="Out of Territory">📍 Out of Territory</option></select></div>
       <div class="form-group"><label>Start Date</label><input type="date" id="es-start"></div>
       <div class="form-group"><label>End Date</label><input type="date" id="es-end"></div>
       <div class="form-group"><label>Status</label>
@@ -3243,6 +3245,7 @@ let SHEET_URL = localStorage.getItem('brad_crm_v3_url') || 'https://script.googl
 // Always hide setup screen and launch
 document.addEventListener('DOMContentLoaded', function() {
   showVisitTimer();
+  applyFieldMode();
   const setup = document.getElementById('setup-screen');
   if (setup) setup.style.display = 'none';
   const app = document.getElementById('main-app');
@@ -4973,6 +4976,29 @@ function _parseCard(text){
   if(!out.company && out.email){ const dom=out.email.split('@')[1]||''; const base=dom.split('.')[0]; if(base) out.company=base.charAt(0).toUpperCase()+base.slice(1); }
   return out;
 }
+const FIELD_MODE_HIDDEN_PANELS = ['reengagement','ar','visits','revenue','activity','plaud','stories','digest-setup','branch-contacts','worktypes','templates','servicelog','equipment','relationships','competitors','lostrentals'];
+function isFieldMode(){ return localStorage.getItem('siteboss_field_mode')==='1'; }
+function applyFieldMode(){
+  const on = isFieldMode();
+  document.body.classList.toggle('field-mode', on);
+  const btn=document.getElementById('field-mode-btn');
+  if(btn){ btn.textContent = on ? '💼 FULL VIEW' : '📱 FIELD MODE'; btn.style.color = on ? 'var(--green)' : 'var(--accent)'; btn.style.borderColor = on ? 'var(--green)' : 'var(--accent)'; }
+}
+function toggleFieldMode(){
+  const goingOn = !isFieldMode();
+  localStorage.setItem('siteboss_field_mode', goingOn ? '1' : '0');
+  applyFieldMode();
+  if(goingOn){
+    // if currently on a hidden panel, jump to dashboard
+    const activePanel = document.querySelector('.panel.active');
+    if(activePanel && FIELD_MODE_HIDDEN_PANELS.includes(activePanel.id.replace('panel-',''))){
+      showPanel('dashboard');
+    }
+    toast('Field Mode on — showing just the basics \u2713');
+  } else {
+    toast('Full view restored');
+  }
+}
 function clearScannedSubs(prefix){
   if(!confirm('Clear all sub fields in this form?')) return;
   for(let n=1;n<=14;n++){
@@ -6618,9 +6644,12 @@ function updateEquipField(prefix) {
       setVal(prefix+'-customer', (c ? (c.company||c.name) : eq.customerName) || '');
       // contact
       setVal(prefix+'-contact', eq.contact || (c ? (c.name+(c.phone?' — '+c.phone:'')) : '') || '');
-      // address
-      const addr = eq.address || (c ? [c.address,c.city,[c.state,c.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ') : '');
-      setVal(prefix+'-address', addr);
+      // address — try stored address, then matched customer, then bare site name as a last resort
+      let addr = eq.address;
+      if (!addr && c) addr = [c.address,c.city,[c.state,c.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+      if (!addr && eq.customerName) { const c2 = clients.find(x=>(x.company||'').toLowerCase()===eq.customerName.toLowerCase()||(x.name||'').toLowerCase()===eq.customerName.toLowerCase()); if (c2) addr = [c2.address,c2.city,[c2.state,c2.zip].filter(Boolean).join(' ')].filter(Boolean).join(', '); }
+      if (!addr && eq.siteName) addr = eq.siteName;
+      setVal(prefix+'-address', addr || '');
       // site: match by name, else drop into manual site field
       const siteSel = document.getElementById(prefix+'-siteId');
       const man = document.getElementById(prefix+'-site-manual');
@@ -8024,7 +8053,9 @@ async function refreshEquipmentFromReport(input) {
       clientId: c ? c.id : '',
       siteId: s ? s.id : '',
       siteName: siteName,
-      address: s ? (s.address||'') : '',
+      address: (s && s.address) ? s.address
+             : (c && c.address) ? [c.address, c.city, [c.state, c.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ')
+             : (siteName || ''),
       customerName: customerName,
       contact: ordered,
       notes: noteParts.join(' | '),
