@@ -415,7 +415,7 @@ body.field-mode .nav-advanced{display:none !important}
 <div id="setup-screen">
   <div class="setup-card">
     <div class="setup-title">BRAD HANNA CRM</div>
-    <div class="setup-sub">v3 — Build: Jul 15i (delivery update messaging)</div>
+    <div class="setup-sub">v3 — Build: Jul 15m (clean up unmatched orders)</div>
     <div class="setup-hint">
       <strong>Step 1:</strong> Create a new Google Spreadsheet<br>
       <strong>Step 2:</strong> Extensions → Apps Script → paste <code>google-apps-script-v3.js</code><br>
@@ -531,7 +531,7 @@ body.field-mode .nav-advanced{display:none !important}
 
     <!-- ══ DASHBOARD ══ -->
     <div class="panel active" id="panel-dashboard">
-      <div style="font-family:var(--fm);font-size:9px;color:var(--muted2);text-align:right;margin-bottom:4px">Build: Jul 15i · delivery update messaging</div>
+      <div style="font-family:var(--fm);font-size:9px;color:var(--muted2);text-align:right;margin-bottom:4px">Build: Jul 15m · clean up unmatched orders</div>
       <!-- QUICK ACTIONS -->
       <div style="margin-bottom:20px">
         <div style="font-family:var(--fh);font-size:13px;letter-spacing:2px;color:var(--muted2);margin-bottom:10px">QUICK ADD</div>
@@ -1673,6 +1673,7 @@ body.field-mode .nav-advanced{display:none !important}
       <div class="section-head">
         <div class="section-title" style="color:var(--green)">📦 ORDERS</div>
         <div class="section-actions">
+          <button class="btn" style="background:var(--surface2);border:1px solid var(--red);color:var(--red)" onclick="cleanUpUnmatchedOrders()">🧹 Clean Up Unmatched</button>
           <button class="btn btn-primary" onclick="showPanel('add-order')">+ Log Order</button>
         </div>
       </div>
@@ -1704,6 +1705,12 @@ body.field-mode .nav-advanced{display:none !important}
       </div>
       <div id="order-newsite-fields" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:10px">
         <div class="form-group" style="margin-bottom:8px"><label>New Site Name</label><input type="text" id="order-newsite-name" placeholder="Site name"></div>
+        <div class="form-group" style="margin-bottom:8px"><label>Address</label><input type="text" id="order-newsite-address" placeholder="123 Main St"></div>
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <div class="form-group" style="flex:1"><label>City</label><input type="text" id="order-newsite-city" placeholder="City"></div>
+          <div class="form-group" style="flex:1"><label>State</label><input type="text" id="order-newsite-state" placeholder="OK"></div>
+          <div class="form-group" style="flex:1"><label>Zip</label><input type="text" id="order-newsite-zip" placeholder="12345"></div>
+        </div>
         <div class="form-group"><label>Zone</label>
           <select id="order-newsite-zone">
             <option value="">— Day / Zone —</option>
@@ -6439,9 +6446,13 @@ async function saveOrder(){
   // If "+ New Site" was chosen, create the real job site first — no double entry later
   if(siteId==='__new__'){
     const siteName=document.getElementById('order-newsite-name').value.trim();
+    const address=document.getElementById('order-newsite-address').value.trim();
+    const city=document.getElementById('order-newsite-city').value.trim();
+    const state=document.getElementById('order-newsite-state').value.trim();
+    const zip=document.getElementById('order-newsite-zip').value.trim();
     const zone=document.getElementById('order-newsite-zone').value;
     if(!siteName){ toast('Enter the new site\'s name', true); return; }
-    const siteRec={ siteName, zone, clientId, status:'Active' };
+    const siteRec={ siteName, address, city, state, zip, zone, clientId, status:'Active' };
     const siteRes=await api({ action:'add', type:'jobsites', record: siteRec });
     if(!(siteRes&&siteRes.success)){ toast('Could not create the job site', true); return; }
     siteId = siteRes.id || '';
@@ -6491,9 +6502,29 @@ function sendOrderUpdate(id){
   const recipientContact = c ? (c.phone || c.email || '') : '';
   showMessage('Delivery Update', body, recipientName, recipientContact);
 }
+function orderDateVal(d){
+  if(!d) return 0;
+  const m = String(d).match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m) return new Date(+m[1], +m[2]-1, +m[3]).getTime();
+  const t = new Date(d).getTime();
+  return isNaN(t) ? 0 : t;
+}
+async function cleanUpUnmatchedOrders(){
+  const unmatched = (orders||[]).filter(o => !clients.find(c=>c.id==o.clientId));
+  if(!unmatched.length){ toast('No unmatched orders \u2014 everything\'s linked to a real customer \u2713'); return; }
+  if(!confirm('Delete '+unmatched.length+' order(s) with no matching customer? This can\'t be undone.')) return;
+  let ok=0;
+  for(const o of unmatched){
+    const res = await api({ action:'delete', type:'orders', id:o.id });
+    if(res&&res.success) ok++;
+  }
+  toast(ok+' unmatched order(s) removed \u2713');
+  await syncAll();
+  renderOrders();
+}
 function renderOrdersPending(){
   const box=document.getElementById('orders-pending-list'); if(!box) return;
-  const pending=(orders||[]).filter(o=>(o.status||'Pending')!=='Delivered').sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  const pending=(orders||[]).filter(o=>(o.status||'Pending')!=='Delivered').sort((a,b)=>orderDateVal(a.date)-orderDateVal(b.date));
   if(!pending.length){ box.innerHTML='<div class="empty-state">Nothing pending \u2014 all caught up. \u2705</div>'; return; }
   box.innerHTML=pending.map(o=>{
     const c=clients.find(c=>c.id==o.clientId);
@@ -6515,7 +6546,7 @@ function renderOrders(){
   const box=document.getElementById('orders-list'); if(!box) return;
   const fmt=n=>{ const v=parseAmount(n); return v? '$'+Math.round(v).toLocaleString('en-US') : ''; };
   const q=(ordersSearch||'').trim().toLowerCase();
-  let list=(orders||[]).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  let list=(orders||[]).slice().sort((a,b)=>orderDateVal(b.date)-orderDateVal(a.date));
   if(q){
     list=list.filter(o=>{
       const c=clients.find(c=>c.id==o.clientId);
@@ -6525,7 +6556,17 @@ function renderOrders(){
   }
   renderOrdersPending();
   if(!list.length){ box.innerHTML='<div class="empty-state"><div class="empty-icon">📦</div>No orders logged yet.</div>'; return; }
-  box.innerHTML=list.map(o=>{
+  const monthGroups = {};
+  list.forEach(o => {
+    const t = orderDateVal(o.date);
+    const dt = t ? new Date(t) : null;
+    const key = dt ? (dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')) : '0000-00';
+    const label = dt ? dt.toLocaleString('en-US',{month:'long',year:'numeric'}) : 'No Date';
+    if(!monthGroups[key]) monthGroups[key] = { label, orders: [] };
+    monthGroups[key].orders.push(o);
+  });
+  const monthKeys = Object.keys(monthGroups).sort((a,b)=>b.localeCompare(a));
+  const rowHtml = o => {
     const c=clients.find(c=>c.id==o.clientId);
     const name=c?(c.company||c.name):'(unknown customer)';
     const status=o.status||'Pending';
@@ -6544,6 +6585,11 @@ function renderOrders(){
         </div>
       </div>
     </div>`;
+  };
+  box.innerHTML = monthKeys.map(k => {
+    const grp = monthGroups[k];
+    return `<div style="font-family:var(--fh);font-size:14px;letter-spacing:1px;color:var(--accent);margin:14px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--border)">${grp.label.toUpperCase()} &middot; ${grp.orders.length} order${grp.orders.length!==1?'s':''}</div>`
+      + grp.orders.map(rowHtml).join('');
   }).join('');
 }
 function renderARByCustomer(){
