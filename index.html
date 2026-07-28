@@ -415,7 +415,7 @@ body.field-mode .nav-advanced{display:none !important}
 <div id="setup-screen">
   <div class="setup-card">
     <div class="setup-title">BRAD HANNA CRM</div>
-    <div class="setup-sub">v3 — Build: Jul 15b (autocomplete safety net)</div>
+    <div class="setup-sub">v3 — Build: Jul 15i (delivery update messaging)</div>
     <div class="setup-hint">
       <strong>Step 1:</strong> Create a new Google Spreadsheet<br>
       <strong>Step 2:</strong> Extensions → Apps Script → paste <code>google-apps-script-v3.js</code><br>
@@ -512,6 +512,7 @@ body.field-mode .nav-advanced{display:none !important}
     <div class="nav-item nav-advanced" onclick="showPanel('activity')">📋 Activity Report</div>
     <div class="nav-item nav-advanced" onclick="showPanel('plaud')">📝 Plaud Notes</div>
     <div class="nav-item nav-advanced" onclick="showPanel('stories')">📖 Story Capture</div>
+    <div class="nav-item" onclick="showPanel('orders');renderOrders()">📦 Orders</div>
     <div class="nav-item nav-advanced" onclick="showPanel('digest-setup')">☀️ Morning Digest</div>
     <div class="nav-item nav-advanced" onclick="showPanel('branch-contacts');renderBranchContacts()">📧 Branch Contacts</div>
     <div class="nav-item nav-advanced" onclick="showPanel('worktypes')">🔧 Work Types</div>
@@ -530,7 +531,7 @@ body.field-mode .nav-advanced{display:none !important}
 
     <!-- ══ DASHBOARD ══ -->
     <div class="panel active" id="panel-dashboard">
-      <div style="font-family:var(--fm);font-size:9px;color:var(--muted2);text-align:right;margin-bottom:4px">Build: Jul 15b · autocomplete safety net</div>
+      <div style="font-family:var(--fm);font-size:9px;color:var(--muted2);text-align:right;margin-bottom:4px">Build: Jul 15i · delivery update messaging</div>
       <!-- QUICK ACTIONS -->
       <div style="margin-bottom:20px">
         <div style="font-family:var(--fh);font-size:13px;letter-spacing:2px;color:var(--muted2);margin-bottom:10px">QUICK ADD</div>
@@ -544,6 +545,7 @@ body.field-mode .nav-advanced{display:none !important}
           <button class="btn" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:11px;padding:8px 14px" onclick="showPanel('add-equipment')">🔧 Equipment</button>
           <button class="btn" style="background:var(--surface2);border:1px solid var(--red);color:var(--red);font-size:11px;padding:8px 14px" onclick="openServiceCall('')">🔧 Service Call</button>
           <button class="btn" style="background:var(--surface2);border:1px solid var(--blue);color:var(--blue);font-size:11px;padding:8px 14px" onclick="openCallOff('')">📞 Call Off</button>
+          <button class="btn" style="background:var(--surface2);border:1px solid var(--green);color:var(--green);font-size:11px;padding:8px 14px" onclick="showPanel('add-order')">📦 Order</button>
           <button class="btn" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:11px;padding:8px 14px" onclick="quickAddTask()">✅ Task</button>
           <button class="btn" style="background:var(--surface2);border:1px solid var(--red);color:var(--red);font-size:11px;padding:8px 14px" onclick="openLogLostRent('standalone','')">📉 Lost Rent</button>
         </div>
@@ -1455,6 +1457,10 @@ body.field-mode .nav-advanced{display:none !important}
       </div>
       <div>
         <div style="font-family:var(--fh);font-size:17px;letter-spacing:2px;color:var(--blue);margin-bottom:10px">ALL EQUIPMENT ON RENT</div>
+        <div style="margin-bottom:10px">
+          <input type="text" id="eq-search" oninput="renderEquipment()" placeholder="🔍 Search by unit #, job site, or customer..." style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;box-sizing:border-box">
+          <div id="eq-search-count" style="font-family:var(--fm);font-size:11px;color:var(--muted2);margin-top:5px"></div>
+        </div>
         <div id="eq-all-list"><div class="empty-state">No equipment tracked yet.</div></div>
       </div>
     </div>
@@ -1553,6 +1559,11 @@ body.field-mode .nav-advanced{display:none !important}
         <div class="dash-card c-yellow"><div class="dash-label">Lost to Price</div><div class="dash-number" id="lr-price" style="font-size:26px;margin-top:4px">$0</div></div>
         <div class="dash-card c-blue"><div class="dash-label">Lost to Availability</div><div class="dash-number" id="lr-avail" style="font-size:26px;margin-top:4px">$0</div></div>
         <div class="dash-card c-blue"><div class="dash-label">Lost to Logistics</div><div class="dash-number" id="lr-logistics" style="font-size:26px;margin-top:4px">$0</div></div>
+      </div>
+      <div style="margin-bottom:20px">
+        <div style="font-family:var(--fh);font-size:17px;letter-spacing:2px;color:var(--green);margin-bottom:6px">🎯 EQUIPMENT NEEDED</div>
+        <div style="font-family:var(--fm);font-size:11px;color:var(--muted2);margin-bottom:10px">Equipment types you've lost deals on most \u2014 where stocking more could mean more revenue.</div>
+        <div id="equip-needed-list"></div>
       </div>
       <div style="font-family:var(--fh);font-size:17px;letter-spacing:2px;color:var(--red);margin-bottom:10px">LOST DEALS</div>
       <div id="lostrentals-list"><div class="empty-state">No lost rentals logged yet. Mark a quote as Lost to track it here.</div></div>
@@ -1656,6 +1667,59 @@ body.field-mode .nav-advanced{display:none !important}
         Tags you can use: <b>{contact}</b> name &middot; <b>{company}</b> &middot; <b>{project}</b> &middot; <b>{portal}</b> (credit link) &middot; <b>{amount}</b> (AR reminder)
       </div>
       <div id="templates-list"></div>
+    </div>
+
+    <div class="panel" id="panel-orders">
+      <div class="section-head">
+        <div class="section-title" style="color:var(--green)">📦 ORDERS</div>
+        <div class="section-actions">
+          <button class="btn btn-primary" onclick="showPanel('add-order')">+ Log Order</button>
+        </div>
+      </div>
+      <div style="margin-bottom:20px">
+        <div style="font-family:var(--fh);font-size:17px;letter-spacing:2px;color:var(--yellow);margin-bottom:6px">📦 EQUIPMENT NEEDED — STILL TO CHECK ON</div>
+        <div style="font-family:var(--fm);font-size:11px;color:var(--muted2);margin-bottom:10px">Orders not yet marked delivered — oldest first.</div>
+        <div id="orders-pending-list"></div>
+      </div>
+      <div style="font-family:var(--fh);font-size:17px;letter-spacing:2px;color:var(--green);margin-bottom:10px">ALL ORDERS</div>
+      <div style="margin-bottom:14px">
+        <input type="text" placeholder="🔍 Search orders by customer or item..." oninput="searchOrders(this.value)" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-size:14px;box-sizing:border-box">
+      </div>
+      <div id="orders-list"></div>
+    </div>
+
+    <div class="panel" id="panel-add-order">
+      <div class="section-head"><div class="section-title" style="color:var(--green)">📦 LOG ORDER</div></div>
+      <div class="form-group" style="margin-bottom:10px">
+        <label>Customer</label>
+        <select id="order-clientId"></select>
+      </div>
+      <div style="display:flex;gap:8px">
+        <div class="form-group" style="flex:1;margin-bottom:10px"><label>Date</label><input type="date" id="order-date"></div>
+        <div class="form-group" style="flex:1;margin-bottom:10px"><label>Value (optional)</label><input type="text" id="order-value" placeholder="$ amount"></div>
+      </div>
+      <div class="form-group" style="margin-bottom:10px">
+        <label>Job Site (optional)</label>
+        <select id="order-siteId" onchange="toggleOrderNewSite()"></select>
+      </div>
+      <div id="order-newsite-fields" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:10px">
+        <div class="form-group" style="margin-bottom:8px"><label>New Site Name</label><input type="text" id="order-newsite-name" placeholder="Site name"></div>
+        <div class="form-group"><label>Zone</label>
+          <select id="order-newsite-zone">
+            <option value="">— Day / Zone —</option>
+            <option value="Monday">Monday</option>
+            <option value="Tuesday">Tuesday</option>
+            <option value="Wednesday">Wednesday</option>
+            <option value="Thursday">Thursday</option>
+            <option value="Friday">Friday</option>
+            <option value="Tulsa">🌆 Tulsa</option>
+            <option value="Out of Territory">📍 Out of Territory</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:10px"><label>What was ordered</label><input type="text" id="order-item" placeholder="e.g. Skid steer, 2 weeks"></div>
+      <div class="form-group" style="margin-bottom:14px"><label>Notes (optional)</label><textarea id="order-notes" rows="3"></textarea></div>
+      <button class="btn btn-primary" style="width:100%" onclick="saveOrder()">SAVE ORDER</button>
     </div>
 
     <div class="panel" id="panel-plaud">
@@ -1910,7 +1974,8 @@ body.field-mode .nav-advanced{display:none !important}
     <div class="modal-actions">
       <button class="btn-ghost" onclick="closeModals()">CLOSE</button>
       <button class="copy-btn" id="msg-copy-btn" onclick="copyMessage()" style="padding:10px 18px">COPY MESSAGE</button>
-      <button class="btn btn-primary" onclick="emailMessage()">OPEN EMAIL →</button>
+      <button class="btn" style="background:var(--blue);color:#fff" onclick="textMessage()">📱 TEXT →</button>
+      <button class="btn btn-primary" onclick="emailMessage()">✉️ EMAIL →</button>
     </div>
   </div>
 </div>
@@ -2475,6 +2540,7 @@ body.field-mode .nav-advanced{display:none !important}
       <div class="pinfo"><div class="pinfo-label">Phone</div><div class="pinfo-val" id="pp-phone">—</div></div>
       <div class="pinfo"><div class="pinfo-label">Email</div><div class="pinfo-val" id="pp-email" style="font-size:12px">—</div></div>
       <div class="pinfo"><div class="pinfo-label">Last Contact</div><div class="pinfo-val" id="pp-last">—</div></div>
+      <div class="pinfo"><div class="pinfo-label">Last Order</div><div class="pinfo-val" id="pp-lastorder" style="color:var(--green)">—</div></div>
       <div class="pinfo"><div class="pinfo-label">Status</div><div class="pinfo-val" id="pp-tier">—</div></div>
       <div class="pinfo"><div class="pinfo-label">Equipment</div><div class="pinfo-val" id="pp-equip" style="font-size:12px">—</div></div>
       <div class="pinfo"><div class="pinfo-label">Project Type</div><div class="pinfo-val" id="pp-project" style="font-size:12px">—</div></div>
@@ -2792,6 +2858,7 @@ let equipment  = [];
 let serviceLogs = [];
 let stories = [];
 let manualActivities = [];
+let orders = [];
 let arFilter  = 'all';
 let arSearch  = '';
 let cFilter   = 'all', cSearch = '';
@@ -3437,6 +3504,7 @@ async function syncAll() {
   const slr = await api({action:'getAll',type:'serviceLogs'}); if(slr&&slr.records) serviceLogs=slr.records.filter(r=>r.id||r.equip);
   const str = await api({action:'getAll',type:'stories'}); if(str&&str.records) stories=str.records.filter(r=>r.id||r.title);
   const mar = await api({action:'getAll',type:'manualActivities'}); if(mar&&mar.records) manualActivities=mar.records.filter(r=>r.id||r.notes);
+  const ordr = await api({action:'getAll',type:'orders'}); if(ordr&&ordr.records) orders=ordr.records.filter(r=>r.id||r.item);
   populateClientDropdowns();
   renderAll();
   if (activeProfileId) openProfile(activeProfileId);
@@ -4058,6 +4126,8 @@ function openProfile(id) {
   document.getElementById('pp-equip').textContent   = c.equip || '—';
   document.getElementById('pp-project').textContent = c.project || '—';
   document.getElementById('pp-last').textContent    = c.lastContact ? `${c.lastContact} (${days}d ago)` : '—';
+  const lo = lastOrderInfo(c.id);
+  document.getElementById('pp-lastorder').textContent = lo ? `${mdy(lo.date)} — ${lo.item} (${daysSince(lo.date)}d ago)` : 'No orders logged';
   document.getElementById('pp-tier').innerHTML      = tierLabel(tier);
   document.getElementById('pp-notes').textContent   = c.notes || '';
   renderCustomerLog(c);
@@ -4260,6 +4330,9 @@ function populateClientDropdowns() {
   const invCOpts = ['<option value="">— Select Customer —</option>', ...clients.map(c => `<option value="${c.id}">${c.name} — ${c.company}</option>`)].join('');
   document.getElementById('inv-clientId').innerHTML = invCOpts;
   document.getElementById('einv-clientId').innerHTML = invCOpts;
+  document.getElementById('order-clientId').innerHTML = invCOpts;
+  const orderSiteOpts = ['<option value="">— None —</option>', '<option value="__new__" style="color:var(--green)">➕ New Site</option>', ...jobsites.slice().sort((a,b)=>(a.siteName||'').localeCompare(b.siteName||'')).map(s => `<option value="${s.id}">${s.siteName}</option>`)].join('');
+  const orderSiteEl=document.getElementById('order-siteId'); if(orderSiteEl) orderSiteEl.innerHTML = orderSiteOpts;
   const invSOpts = ['<option value="">— None —</option>', ...jobsites.map(s => `<option value="${s.id}">${s.siteName}</option>`)].join('');
   document.getElementById('inv-siteId').innerHTML = invSOpts;
   document.getElementById('einv-siteId').innerHTML = invSOpts;
@@ -4430,6 +4503,7 @@ function renderAll() {
   renderRelationships();
   renderCompetitors();
   renderLostRentals();
+  renderEquipmentNeeded();
   renderDashProspects();
   renderVisits();
   renderActivityReport();
@@ -5989,7 +6063,9 @@ function exportAR() {
     { label:'120+ DAYS',           test:d => d >= 121 }
   ];
   const fmt = n => '$' + (Math.round(n)).toLocaleString('en-US');
-  const rows = [['Customer','Company','Amount','Days Past Due','Status','Last Action','Notes']];
+  const rows = [['Customer','Company','Amount','Days Past Due','Status','Last Action','Notes','Legal Status','Payment Plan']];
+  const legalStr = c => c && c.legalStatus ? c.legalStatus + (c.legalDate ? ' (' + mdy(c.legalDate) + ')' : '') : '';
+  const planStr = c => c && c.planStatus ? c.planStatus + (c.planMonthly ? ' — ' + fmt(parseAmount(c.planMonthly)) + '/mo' : '') + (c.planNextDue ? ', next due ' + mdy(c.planNextDue) : '') : '';
   let grand = 0;
   tiers.forEach(tier => {
     const custName = inv => {
@@ -6003,7 +6079,7 @@ function exportAR() {
       .sort((a,b) => custName(a).localeCompare(custName(b)) || (daysSinceInvoice(b) - daysSinceInvoice(a)));
     if (!items.length) return;
     let subtotal = 0;
-    rows.push(['── ' + tier.label + ' ──','','','','','','']);
+    rows.push(['── ' + tier.label + ' ──','','','','','','','','']);
     // Group this tier's invoices by customer (alphabetical), with a per-customer subtotal
     const byCust = {};
     items.forEach(inv => { const key = custName(inv); (byCust[key] = byCust[key] || []).push(inv); });
@@ -6021,22 +6097,22 @@ function exportAR() {
         const actions = parseActions(inv.actions);
         const lastAction = actions.length ? `${actions[0].date} — ${actions[0].type}${actions[0].notes?': '+actions[0].notes:''}` : '—';
         const currentNote = (inv.notes||'').split(' | ').pop().trim() || '—';
-        rows.push([c?(c.name||c.company):custLabel, c?c.company:'—', fmt(amt), days, inv.status||'—', lastAction, currentNote]);
+        rows.push([c?(c.name||c.company):custLabel, c?c.company:'—', fmt(amt), days, inv.status||'—', lastAction, currentNote, legalStr(c), planStr(c)]);
       });
-      if (custInvs.length > 1) rows.push(['', '   ' + custLabel + ' subtotal', fmt(custSub), '', '', '', '']);
+      if (custInvs.length > 1) rows.push(['', '   ' + custLabel + ' subtotal', fmt(custSub), '', '', '', '', '', '']);
     });
-    rows.push(['', 'Subtotal ' + tier.label, fmt(subtotal), '', '', '', '']);
-    rows.push(['','','','','','','']);
+    rows.push(['', 'Subtotal ' + tier.label, fmt(subtotal), '', '', '', '', '', '']);
+    rows.push(['','','','','','','','','']);
     grand += subtotal;
   });
-  rows.push(['', 'TOTAL OUTSTANDING', fmt(grand), '', '', '', '']);
+  rows.push(['', 'TOTAL OUTSTANDING', fmt(grand), '', '', '', '', '', '']);
   const csv = rows.map(r => r.map(v => `"${(v==null?'':v).toString().replace(/"/g,'""')}"`).join(',')).join('\n');
   const blob = new Blob([csv], { type:'text/csv' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
   a.href = url; a.download = `AR-Report-${today()}.csv`;
   a.click(); URL.revokeObjectURL(url);
-  toast('AR Report exported — by aging, A\u2013Z by customer \u2713');
+  toast('AR Report exported — with legal & payment plan status \u2713');
 }
 
 function filterAR(f, btn) {
@@ -6049,6 +6125,7 @@ function filterAR(f, btn) {
   renderRelationships();
   renderCompetitors();
   renderLostRentals();
+  renderEquipmentNeeded();
   renderDashProspects();
   renderVisits();
   renderActivityReport();
@@ -6332,6 +6409,142 @@ async function saveArPlan(){
   const res=await api({action:'update',type:'clients',record:rec});
   if(res&&res.success){ Object.assign(c,rec); toast('Payment plan saved \u2713'); closeModals(); renderARPlan(); }
   else toast('Could not save',true);
+}
+let ordersSearch='';
+function searchOrders(v){ ordersSearch=v; renderOrders(); }
+function customerOrders(clientId){
+  return (orders||[]).filter(o=>o.clientId==clientId).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+}
+function lastOrderInfo(clientId){
+  const list=customerOrders(clientId);
+  if(!list.length) return null;
+  return list[0];
+}
+function toggleOrderNewSite(){
+  const sel=document.getElementById('order-siteId');
+  const box=document.getElementById('order-newsite-fields');
+  if(!sel||!box) return;
+  box.style.display = sel.value==='__new__' ? 'block' : 'none';
+}
+async function saveOrder(){
+  const clientId=document.getElementById('order-clientId').value;
+  const date=document.getElementById('order-date').value||today();
+  const item=document.getElementById('order-item').value.trim();
+  const value=document.getElementById('order-value').value.trim();
+  const notes=document.getElementById('order-notes').value.trim();
+  let siteId=document.getElementById('order-siteId').value;
+  if(!clientId){ toast('Pick a customer', true); return; }
+  if(!item){ toast('Enter what was ordered', true); return; }
+
+  // If "+ New Site" was chosen, create the real job site first — no double entry later
+  if(siteId==='__new__'){
+    const siteName=document.getElementById('order-newsite-name').value.trim();
+    const zone=document.getElementById('order-newsite-zone').value;
+    if(!siteName){ toast('Enter the new site\'s name', true); return; }
+    const siteRec={ siteName, zone, clientId, status:'Active' };
+    const siteRes=await api({ action:'add', type:'jobsites', record: siteRec });
+    if(!(siteRes&&siteRes.success)){ toast('Could not create the job site', true); return; }
+    siteId = siteRes.id || '';
+    toast('Job site "'+siteName+'" added to your list \u2713');
+  }
+
+  const record={ clientId, date, item, value, notes, siteId, status:'Pending' };
+  const res=await api({ action:'add', type:'orders', record });
+  if(res&&res.success){
+    toast('Order logged \u2713');
+    await syncAll();
+    showPanel('orders'); renderOrders();
+  } else toast('Could not save order', true);
+}
+async function deleteOrder(id){
+  if(!confirm('Delete this order?')) return;
+  const res=await api({ action:'delete', type:'orders', id });
+  if(res&&res.success){ toast('Order deleted'); await syncAll(); renderOrders(); }
+  else toast('Could not delete', true);
+}
+async function markOrderDelivered(id){
+  const o=(orders||[]).find(x=>x.id==id); if(!o) return;
+  const rec={...o, status:'Delivered'};
+  const res=await api({ action:'update', type:'orders', record: rec });
+  if(res&&res.success){ Object.assign(o, rec); toast('Marked delivered \u2713'); renderOrders(); }
+  else toast('Could not update', true);
+}
+async function reopenOrder(id){
+  const o=(orders||[]).find(x=>x.id==id); if(!o) return;
+  const rec={...o, status:'Pending'};
+  const res=await api({ action:'update', type:'orders', record: rec });
+  if(res&&res.success){ Object.assign(o, rec); toast('Marked pending again'); renderOrders(); }
+  else toast('Could not update', true);
+}
+function sendOrderUpdate(id){
+  const o=(orders||[]).find(x=>x.id==id); if(!o) return;
+  const c=clients.find(x=>x.id==o.clientId);
+  const deliveryTime=prompt('Delivery time to tell '+(c?(c.company||c.name):'the customer')+':', 'Tomorrow morning, 8-10am');
+  if(deliveryTime===null || !deliveryTime.trim()) return;
+  const body=fillTemplate('deliveryUpdate', {
+    contact: c?(c.name||c.company):'there',
+    company: c?(c.company||''):'',
+    item: o.item||'your order',
+    deliveryTime: deliveryTime.trim()
+  });
+  const recipientName = c ? c.name : '';
+  const recipientContact = c ? (c.phone || c.email || '') : '';
+  showMessage('Delivery Update', body, recipientName, recipientContact);
+}
+function renderOrdersPending(){
+  const box=document.getElementById('orders-pending-list'); if(!box) return;
+  const pending=(orders||[]).filter(o=>(o.status||'Pending')!=='Delivered').sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  if(!pending.length){ box.innerHTML='<div class="empty-state">Nothing pending \u2014 all caught up. \u2705</div>'; return; }
+  box.innerHTML=pending.map(o=>{
+    const c=clients.find(c=>c.id==o.clientId);
+    const name=c?(c.company||c.name):'(unknown customer)';
+    const days=daysSince(o.date);
+    const urgent = days>=7;
+    return `<div style="background:var(--surface2);border:1px solid var(--border);border-left:3px solid ${urgent?'var(--red)':'var(--yellow)'};border-radius:6px;padding:10px 12px;margin-bottom:6px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:13px" ${c?`onclick="openProfile('${c.id}')" style="cursor:pointer"`:''}>${name}</div>
+          <div style="font-family:var(--fm);font-size:11px;color:${urgent?'var(--red)':'var(--muted2)'};margin-top:2px">${(o.item||'').replace(/</g,'&lt;')} &middot; ordered ${mdy(o.date)} (${days}d ago)</div>
+        </div>
+        <div style="display:flex;gap:5px"><button class="btn-small" style="color:var(--blue);border-color:var(--blue)" onclick="sendOrderUpdate('${o.id}')">📩 Update</button><button class="btn-small" style="color:var(--green);border-color:var(--green)" onclick="markOrderDelivered('${o.id}')">✓ Delivered</button></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function renderOrders(){
+  const box=document.getElementById('orders-list'); if(!box) return;
+  const fmt=n=>{ const v=parseAmount(n); return v? '$'+Math.round(v).toLocaleString('en-US') : ''; };
+  const q=(ordersSearch||'').trim().toLowerCase();
+  let list=(orders||[]).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  if(q){
+    list=list.filter(o=>{
+      const c=clients.find(c=>c.id==o.clientId);
+      const custName=(c?(c.company||c.name):'').toLowerCase();
+      return custName.includes(q) || (o.item||'').toLowerCase().includes(q) || (o.notes||'').toLowerCase().includes(q);
+    });
+  }
+  renderOrdersPending();
+  if(!list.length){ box.innerHTML='<div class="empty-state"><div class="empty-icon">📦</div>No orders logged yet.</div>'; return; }
+  box.innerHTML=list.map(o=>{
+    const c=clients.find(c=>c.id==o.clientId);
+    const name=c?(c.company||c.name):'(unknown customer)';
+    const status=o.status||'Pending';
+    const isDelivered=status==='Delivered';
+    return `<div style="background:var(--surface2);border:1px solid var(--border);border-left:3px solid ${isDelivered?'var(--green)':'var(--yellow)'};border-radius:6px;padding:10px 12px;margin-bottom:6px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:13px" ${c?`onclick="openProfile('${c.id}')" style="cursor:pointer"`:''}>${name} <span style="font-family:var(--fm);font-size:9px;color:${isDelivered?'var(--green)':'var(--yellow)'};border:1px solid ${isDelivered?'var(--green)':'var(--yellow)'};border-radius:3px;padding:1px 5px;margin-left:4px">${isDelivered?'✓ DELIVERED':'PENDING'}</span></div>
+          <div style="font-family:var(--fm);font-size:11px;color:var(--muted2);margin-top:2px">${mdy(o.date)} &middot; ${(o.item||'').replace(/</g,'&lt;')}${o.value?' &middot; '+fmt(o.value):''}</div>
+          ${o.notes?`<div style="font-family:var(--fm);font-size:10px;color:var(--muted2);margin-top:3px">${o.notes.replace(/</g,'&lt;')}</div>`:''}
+        </div>
+        <div style="display:flex;gap:5px">
+          <button class="btn-small" style="color:var(--blue);border-color:var(--blue)" onclick="sendOrderUpdate('${o.id}')">📩</button>
+          ${isDelivered?`<button class="btn-small" style="color:var(--yellow);border-color:var(--yellow)" onclick="reopenOrder('${o.id}')">↺</button>`:`<button class="btn-small" style="color:var(--green);border-color:var(--green)" onclick="markOrderDelivered('${o.id}')">✓</button>`}
+          <button class="btn-small" style="color:var(--red);border-color:var(--red)" onclick="deleteOrder('${o.id}')">✕</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
 }
 function renderARByCustomer(){
   const list=document.getElementById('ar-bycustomer-list');
@@ -7667,6 +7880,12 @@ function emailMessage() {
   const body = encodeURIComponent(document.getElementById('msg-body').value);
   window.location.href = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${body}`;
 }
+function textMessage() {
+  const to = (document.getElementById('msg-recipient').value||'').replace(/[^0-9+]/g,'');
+  const body = encodeURIComponent(document.getElementById('msg-body').value);
+  if(!to){ toast('Enter a phone number to text', true); return; }
+  window.location.href = `sms:${to}&body=${body}`;
+}
 
 // Credit App — prospects only
 const TPL_DEFAULTS = {
@@ -7710,6 +7929,17 @@ Could you let me know when we might expect payment? Happy to help if there's any
 
 Appreciate you,
 Brad Hanna`
+  },
+  deliveryUpdate: {
+    label: 'Delivery Update',
+    text: `Hi {contact}, wanted to give you an update on your order — {item}.
+
+Delivery: {deliveryTime}
+
+Let me know if anything changes on your end or if you need anything adjusted.
+
+Brad Hanna
+405-203-2125`
   }
 };
 function getTemplate(key){
@@ -8932,6 +9162,38 @@ async function deleteLostRent(id) {
   if (res && res.success) { toast('Removed ✓'); await syncAll(); }
 }
 
+function renderEquipmentNeeded() {
+  const box = document.getElementById('equip-needed-list'); if (!box) return;
+  function parseAmt(str) { if (typeof str === 'number') return str; return parseFloat((str||'').toString().replace(/[^0-9.]/g,''))||0; }
+  const groups = {};
+  lostRents.forEach(r => {
+    const key = (r.equip||'').trim();
+    if (!key) return;
+    const norm = key.toLowerCase();
+    if (!groups[norm]) groups[norm] = { label: key, count: 0, value: 0, reasons: {} };
+    groups[norm].count += 1;
+    groups[norm].value += parseAmt(r.value);
+    const reason = r.reason || 'Unspecified';
+    groups[norm].reasons[reason] = (groups[norm].reasons[reason]||0) + 1;
+  });
+  const list = Object.values(groups).sort((a,b) => b.value - a.value);
+  if (!list.length) { box.innerHTML = '<div class="empty-state">No equipment-type patterns yet \u2014 log a lost rental with the equipment type to start tracking this.</div>'; return; }
+  const maxVal = Math.max(...list.map(g=>g.value), 1);
+  box.innerHTML = list.map(g => {
+    const pct = Math.round((g.value/maxVal)*100);
+    const topReason = Object.entries(g.reasons).sort((a,b)=>b[1]-a[1])[0];
+    return `<div style="background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--green);border-radius:6px;padding:10px 12px;margin-bottom:6px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:14px">${g.label}</div>
+          <div style="font-family:var(--fm);font-size:11px;color:var(--muted2);margin-top:2px">Lost ${g.count} time${g.count!==1?'s':''}${topReason?' \u00b7 mostly '+topReason[0]:''}</div>
+          <div style="height:5px;background:var(--bg);border-radius:3px;margin-top:6px;overflow:hidden"><div style="height:100%;width:${pct}%;background:var(--green)"></div></div>
+        </div>
+        <div style="font-family:var(--fh);font-size:20px;color:var(--green);white-space:nowrap">${g.value?money(g.value):'—'}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
 function renderLostRentals() {
   // Combine: lost prospects + lostRents log
   const lostProspects = prospects.filter(p => p.stage === 'Lost');
@@ -9265,7 +9527,7 @@ function setMapFilter(f, btn) {
 function showPanel(id) {
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.getElementById('panel-'+id).classList.add('active');
-  const panels = ['dashboard','customers','jobsites','reengagement','add-customer','add-site','ar','tasks','revenue','visits','add-visit','activity','servicelog','stories','digest-setup','branch-contacts','equipment','add-equipment','relationships','competitors','lostrentals','map','prospects','add-prospect','followups','add-followup','add-invoice','plaud','todayroute','worktypes','templates'];
+  const panels = ['dashboard','customers','jobsites','reengagement','add-customer','add-site','ar','tasks','revenue','visits','add-visit','activity','servicelog','stories','digest-setup','branch-contacts','equipment','add-equipment','relationships','competitors','lostrentals','map','prospects','add-prospect','followups','add-followup','add-invoice','plaud','todayroute','worktypes','templates','orders','add-order'];
   document.querySelectorAll('.nav-item').forEach((n,i) => {
     n.classList.toggle('active', panels[i] === id);
   });
@@ -9273,6 +9535,8 @@ function showPanel(id) {
   if (id === 'plaud') renderPlaud();
   if (id === 'worktypes') renderWorkTypes();
   if (id === 'templates') renderTemplates();
+  if (id === 'orders') renderOrders();
+  if (id === 'add-order'){ const d=document.getElementById('order-date'); if(d) d.value=today(); const v=document.getElementById('order-value'); if(v) v.value=''; const it=document.getElementById('order-item'); if(it) it.value=''; const n=document.getElementById('order-notes'); if(n) n.value=''; const c=document.getElementById('order-clientId'); if(c) c.value=''; }
   if (id === 'digest-setup'){ const a=document.getElementById('aiscan-status'); if(a) a.textContent=_aiScanEnabled()?'ON':'OFF'; const t=document.getElementById('api-token-input'); if(t) t.value=API_TOKEN; }
   if (id === 'todayroute') { const d=document.getElementById('tr-day'); if(d && !d._init){ d._init=true; const wd=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date().getDay()]; d.value=(wd==='Saturday'||wd==='Sunday')?'Monday':wd; } renderTodayRoute(); }
   if (id === 'branch-contacts') renderBranchContacts();
