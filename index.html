@@ -415,7 +415,7 @@ body.field-mode .nav-advanced{display:none !important}
 <div id="setup-screen">
   <div class="setup-card">
     <div class="setup-title">BRAD HANNA CRM</div>
-    <div class="setup-sub">v3 — Build: Jul 15m (clean up unmatched orders)</div>
+    <div class="setup-sub">v3 — Build: Jul 15p (import contacts button fixed)</div>
     <div class="setup-hint">
       <strong>Step 1:</strong> Create a new Google Spreadsheet<br>
       <strong>Step 2:</strong> Extensions → Apps Script → paste <code>google-apps-script-v3.js</code><br>
@@ -531,7 +531,7 @@ body.field-mode .nav-advanced{display:none !important}
 
     <!-- ══ DASHBOARD ══ -->
     <div class="panel active" id="panel-dashboard">
-      <div style="font-family:var(--fm);font-size:9px;color:var(--muted2);text-align:right;margin-bottom:4px">Build: Jul 15m · clean up unmatched orders</div>
+      <div style="font-family:var(--fm);font-size:9px;color:var(--muted2);text-align:right;margin-bottom:4px">Build: Jul 15p · import contacts button</div>
       <!-- QUICK ACTIONS -->
       <div style="margin-bottom:20px">
         <div style="font-family:var(--fh);font-size:13px;letter-spacing:2px;color:var(--muted2);margin-bottom:10px">QUICK ADD</div>
@@ -718,6 +718,8 @@ body.field-mode .nav-advanced{display:none !important}
         <div class="section-title" style="color:var(--green)">👷 CUSTOMERS</div>
         <div class="section-actions">
           <span class="badge" id="cust-count">0 customers</span>
+          <button class="btn" style="background:var(--surface2);border:1px solid var(--green);color:var(--green)" onclick="document.getElementById('cust-import-file').click()">⬆ Import Contacts</button>
+          <input type="file" id="cust-import-file" accept=".csv" style="display:none" onchange="importContacts(this)">
           <button class="btn btn-primary" onclick="showPanel('add-customer')">+ Add</button>
         </div>
       </div>
@@ -1690,7 +1692,8 @@ body.field-mode .nav-advanced{display:none !important}
     </div>
 
     <div class="panel" id="panel-add-order">
-      <div class="section-head"><div class="section-title" style="color:var(--green)">📦 LOG ORDER</div></div>
+      <div class="section-head"><div class="section-title" style="color:var(--green)" id="order-form-title">📦 LOG ORDER</div></div>
+      <input type="hidden" id="order-edit-id" value="">
       <div class="form-group" style="margin-bottom:10px">
         <label>Customer</label>
         <select id="order-clientId"></select>
@@ -2942,7 +2945,8 @@ function attachAutocomplete(inputId, cityId, stateId, zipId){
           const state=comp('administrative_area_level_1',true);
           const zip=comp('postal_code');
           const setVal=(id,v)=>{if(id&&v){const el=document.getElementById(id);if(el)el.value=v;}};
-          input.value = street || p.description;
+          // If there's a separate city field, split street from city; otherwise fill the whole formatted address in one field
+          input.value = cityId ? (street || p.description) : (p.description || street);
           if(cityId){ const el=document.getElementById(cityId); if(el) el.value = city || el.value; }
           setVal(stateId,state);
           setVal(zipId,zip);
@@ -3082,7 +3086,13 @@ const ADDRESS_FIELD_SETS=[
   ['qs-address','qs-city',null,null],
   ['f-address','f-city','f-state','f-zip'],
   ['ec-address','ec-city','ec-state','ec-zip'],
-  ['qc-address','qc-city','qc-state','qc-zip']
+  ['qc-address','qc-city','qc-state','qc-zip'],
+  ['order-newsite-address','order-newsite-city','order-newsite-state','order-newsite-zip'],
+  ['co-address',null,null,null],
+  ['svc-address',null,null,null],
+  ['eq-address',null,null,null],
+  ['eqe-address',null,null,null],
+  ['el-address',null,null,null]
 ];
 function initMapAutocomplete(prefix){
   try{
@@ -6459,6 +6469,20 @@ async function saveOrder(){
     toast('Job site "'+siteName+'" added to your list \u2713');
   }
 
+  const editId=document.getElementById('order-edit-id').value;
+  if(editId){
+    const existing=(orders||[]).find(o=>o.id==editId);
+    const record={ ...existing, clientId, date, item, value, notes, siteId };
+    const res=await api({ action:'update', type:'orders', record });
+    if(res&&res.success){
+      Object.assign(existing, record);
+      toast('Order updated \u2713');
+      document.getElementById('order-edit-id').value='';
+      document.getElementById('order-form-title').textContent='📦 LOG ORDER';
+      showPanel('orders'); renderOrders();
+    } else toast('Could not update order', true);
+    return;
+  }
   const record={ clientId, date, item, value, notes, siteId, status:'Pending' };
   const res=await api({ action:'add', type:'orders', record });
   if(res&&res.success){
@@ -6466,6 +6490,22 @@ async function saveOrder(){
     await syncAll();
     showPanel('orders'); renderOrders();
   } else toast('Could not save order', true);
+}
+function openEditOrder(id){
+  const o=(orders||[]).find(x=>x.id==id); if(!o) return;
+  showPanel('add-order');
+  setTimeout(()=>{
+    document.getElementById('order-edit-id').value=o.id;
+    document.getElementById('order-form-title').textContent='✎ EDIT ORDER';
+    document.getElementById('order-clientId').value=o.clientId||'';
+    document.getElementById('order-date').value=o.date? normDate(o.date) : today();
+    document.getElementById('order-item').value=o.item||'';
+    document.getElementById('order-value').value=o.value||'';
+    document.getElementById('order-notes').value=o.notes||'';
+    const siteSel=document.getElementById('order-siteId');
+    if(siteSel) siteSel.value=o.siteId||'';
+    document.getElementById('order-newsite-fields').style.display='none';
+  }, 80);
 }
 async function deleteOrder(id){
   if(!confirm('Delete this order?')) return;
@@ -6537,7 +6577,7 @@ function renderOrdersPending(){
           <div style="font-weight:600;font-size:13px" ${c?`onclick="openProfile('${c.id}')" style="cursor:pointer"`:''}>${name}</div>
           <div style="font-family:var(--fm);font-size:11px;color:${urgent?'var(--red)':'var(--muted2)'};margin-top:2px">${(o.item||'').replace(/</g,'&lt;')} &middot; ordered ${mdy(o.date)} (${days}d ago)</div>
         </div>
-        <div style="display:flex;gap:5px"><button class="btn-small" style="color:var(--blue);border-color:var(--blue)" onclick="sendOrderUpdate('${o.id}')">📩 Update</button><button class="btn-small" style="color:var(--green);border-color:var(--green)" onclick="markOrderDelivered('${o.id}')">✓ Delivered</button></div>
+        <div style="display:flex;gap:5px"><button class="btn-small" style="color:var(--yellow);border-color:var(--yellow)" onclick="openEditOrder('${o.id}')">✎</button><button class="btn-small" style="color:var(--blue);border-color:var(--blue)" onclick="sendOrderUpdate('${o.id}')">📩 Update</button><button class="btn-small" style="color:var(--green);border-color:var(--green)" onclick="markOrderDelivered('${o.id}')">✓ Delivered</button></div>
       </div>
     </div>`;
   }).join('');
@@ -6579,6 +6619,7 @@ function renderOrders(){
           ${o.notes?`<div style="font-family:var(--fm);font-size:10px;color:var(--muted2);margin-top:3px">${o.notes.replace(/</g,'&lt;')}</div>`:''}
         </div>
         <div style="display:flex;gap:5px">
+          <button class="btn-small" style="color:var(--yellow);border-color:var(--yellow)" onclick="openEditOrder('${o.id}')">✎</button>
           <button class="btn-small" style="color:var(--blue);border-color:var(--blue)" onclick="sendOrderUpdate('${o.id}')">📩</button>
           ${isDelivered?`<button class="btn-small" style="color:var(--yellow);border-color:var(--yellow)" onclick="reopenOrder('${o.id}')">↺</button>`:`<button class="btn-small" style="color:var(--green);border-color:var(--green)" onclick="markOrderDelivered('${o.id}')">✓</button>`}
           <button class="btn-small" style="color:var(--red);border-color:var(--red)" onclick="deleteOrder('${o.id}')">✕</button>
@@ -9582,7 +9623,7 @@ function showPanel(id) {
   if (id === 'worktypes') renderWorkTypes();
   if (id === 'templates') renderTemplates();
   if (id === 'orders') renderOrders();
-  if (id === 'add-order'){ const d=document.getElementById('order-date'); if(d) d.value=today(); const v=document.getElementById('order-value'); if(v) v.value=''; const it=document.getElementById('order-item'); if(it) it.value=''; const n=document.getElementById('order-notes'); if(n) n.value=''; const c=document.getElementById('order-clientId'); if(c) c.value=''; }
+  if (id === 'add-order'){ const d=document.getElementById('order-date'); if(d) d.value=today(); const v=document.getElementById('order-value'); if(v) v.value=''; const it=document.getElementById('order-item'); if(it) it.value=''; const n=document.getElementById('order-notes'); if(n) n.value=''; const c=document.getElementById('order-clientId'); if(c) c.value=''; const eid=document.getElementById('order-edit-id'); if(eid) eid.value=''; const ft=document.getElementById('order-form-title'); if(ft) ft.textContent='\ud83d\udce6 LOG ORDER'; }
   if (id === 'digest-setup'){ const a=document.getElementById('aiscan-status'); if(a) a.textContent=_aiScanEnabled()?'ON':'OFF'; const t=document.getElementById('api-token-input'); if(t) t.value=API_TOKEN; }
   if (id === 'todayroute') { const d=document.getElementById('tr-day'); if(d && !d._init){ d._init=true; const wd=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date().getDay()]; d.value=(wd==='Saturday'||wd==='Sunday')?'Monday':wd; } renderTodayRoute(); }
   if (id === 'branch-contacts') renderBranchContacts();
