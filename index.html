@@ -415,7 +415,7 @@ body.field-mode .nav-advanced{display:none !important}
 <div id="setup-screen">
   <div class="setup-card">
     <div class="setup-title">BRAD HANNA CRM</div>
-    <div class="setup-sub">v3 — Build: Jul 15p (import contacts button fixed)</div>
+    <div class="setup-sub">v3 — Build: Jul 15q (cleanup safety checks)</div>
     <div class="setup-hint">
       <strong>Step 1:</strong> Create a new Google Spreadsheet<br>
       <strong>Step 2:</strong> Extensions → Apps Script → paste <code>google-apps-script-v3.js</code><br>
@@ -531,7 +531,7 @@ body.field-mode .nav-advanced{display:none !important}
 
     <!-- ══ DASHBOARD ══ -->
     <div class="panel active" id="panel-dashboard">
-      <div style="font-family:var(--fm);font-size:9px;color:var(--muted2);text-align:right;margin-bottom:4px">Build: Jul 15p · import contacts button</div>
+      <div style="font-family:var(--fm);font-size:9px;color:var(--muted2);text-align:right;margin-bottom:4px">Build: Jul 15q · cleanup safety checks</div>
       <!-- QUICK ACTIONS -->
       <div style="margin-bottom:20px">
         <div style="font-family:var(--fh);font-size:13px;letter-spacing:2px;color:var(--muted2);margin-bottom:10px">QUICK ADD</div>
@@ -6552,14 +6552,27 @@ function orderDateVal(d){
 async function cleanUpUnmatchedOrders(){
   const unmatched = (orders||[]).filter(o => !clients.find(c=>c.id==o.clientId));
   if(!unmatched.length){ toast('No unmatched orders \u2014 everything\'s linked to a real customer \u2713'); return; }
-  if(!confirm('Delete '+unmatched.length+' order(s) with no matching customer? This can\'t be undone.')) return;
-  let ok=0;
+  const custCountBefore = clients.length;
+  const preview = unmatched.slice(0,15).map(o => '  \u2022 id:'+o.id+' | '+(o.item||'(no item)')+' | '+(o.date||'no date')).join('\n');
+  const more = unmatched.length>15 ? '\n  ...and '+(unmatched.length-15)+' more' : '';
+  if(!confirm('About to delete '+unmatched.length+' order(s):\n\n'+preview+more+'\n\nCustomers on file right now: '+custCountBefore+'\n\nProceed?')) return;
+  let ok=0, wrongSheetHits=[];
   for(const o of unmatched){
     const res = await api({ action:'delete', type:'orders', id:o.id });
-    if(res&&res.success) ok++;
+    if(res&&res.success){
+      ok++;
+      if(res.deletedFromSheet && res.deletedFromSheet !== 'Orders'){ wrongSheetHits.push(o.id+' -> '+res.deletedFromSheet); }
+    }
+  }
+  if(wrongSheetHits.length){
+    alert('\u26a0\ufe0f WARNING: The server reported deleting from the WRONG sheet for these:\n\n'+wrongSheetHits.join('\n')+'\n\nSTOP and tell Brad\'s developer immediately \u2014 do not use this button again until this is investigated.');
   }
   toast(ok+' unmatched order(s) removed \u2713');
   await syncAll();
+  const custCountAfter = clients.length;
+  if(custCountAfter !== custCountBefore){
+    alert('\u26a0\ufe0f CUSTOMER COUNT CHANGED: was '+custCountBefore+', now '+custCountAfter+'. Something affected customers during this cleanup. Please check your Clients sheet directly and report this.');
+  }
   renderOrders();
 }
 function renderOrdersPending(){
