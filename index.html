@@ -415,7 +415,7 @@ body.field-mode .nav-advanced{display:none !important}
 <div id="setup-screen">
   <div class="setup-card">
     <div class="setup-title">BRAD HANNA CRM</div>
-    <div class="setup-sub">v3 — Build: Jul 15u (cache-busting fix)</div>
+    <div class="setup-sub">v3 — Build: Jul 15v (orders debug tool)</div>
     <div class="setup-hint">
       <strong>Step 1:</strong> Create a new Google Spreadsheet<br>
       <strong>Step 2:</strong> Extensions → Apps Script → paste <code>google-apps-script-v3.js</code><br>
@@ -531,7 +531,7 @@ body.field-mode .nav-advanced{display:none !important}
 
     <!-- ══ DASHBOARD ══ -->
     <div class="panel active" id="panel-dashboard">
-      <div style="font-family:var(--fm);font-size:9px;color:var(--muted2);text-align:right;margin-bottom:4px">Build: Jul 15u · cache-busting fix</div>
+      <div style="font-family:var(--fm);font-size:9px;color:var(--muted2);text-align:right;margin-bottom:4px">Build: Jul 15v · orders debug tool</div>
       <!-- QUICK ACTIONS -->
       <div style="margin-bottom:20px">
         <div style="font-family:var(--fh);font-size:13px;letter-spacing:2px;color:var(--muted2);margin-bottom:10px">QUICK ADD</div>
@@ -1676,6 +1676,7 @@ body.field-mode .nav-advanced{display:none !important}
         <div class="section-title" style="color:var(--green)">📦 ORDERS</div>
         <div class="section-actions">
           <button class="btn" style="background:var(--surface2);border:1px solid var(--red);color:var(--red)" onclick="cleanUpUnmatchedOrders()">🧹 Clean Up Unmatched</button>
+          <button class="btn" style="background:var(--surface2);border:1px solid var(--yellow);color:var(--yellow)" onclick="showOrdersDebug()">🔍 Debug Info</button>
           <button class="btn btn-primary" onclick="showPanel('add-order')">+ Log Order</button>
         </div>
       </div>
@@ -3527,7 +3528,10 @@ async function syncAll() {
   const slr = await api({action:'getAll',type:'serviceLogs'}); if(slr&&slr.records) serviceLogs=slr.records.filter(r=>r.id||r.equip);
   const str = await api({action:'getAll',type:'stories'}); if(str&&str.records) stories=str.records.filter(r=>r.id||r.title);
   const mar = await api({action:'getAll',type:'manualActivities'}); if(mar&&mar.records) manualActivities=mar.records.filter(r=>r.id||r.notes);
-  const ordr = await api({action:'getAll',type:'orders'}); if(ordr&&ordr.records) orders=ordr.records.filter(r=>r.id||r.item);
+  const ordr = await api({action:'getAll',type:'orders'});
+  window._lastOrdersDebug = { raw: ordr, rawCount: (ordr&&ordr.records)?ordr.records.length:'N/A (no records field)', error: (ordr&&ordr.error)?ordr.error:null };
+  if(ordr&&ordr.records) orders=ordr.records.filter(r=>r.id||r.item);
+  window._lastOrdersDebug.afterFilterCount = orders.length;
   populateClientDropdowns();
   renderAll();
   if (activeProfileId) openProfile(activeProfileId);
@@ -6589,6 +6593,17 @@ async function cleanUpUnmatchedOrders(){
     alert('\u26a0\ufe0f CUSTOMER COUNT CHANGED: was '+custCountBefore+', now '+custCountAfter+'. Something affected customers during this cleanup. Please check your Clients sheet directly and report this.');
   }
   renderOrders();
+}
+function showOrdersDebug(){
+  const d = window._lastOrdersDebug;
+  if(!d){ alert('No sync has run yet in this session. Tap \u27f2 SYNC on the dashboard first, then come back and tap this again.'); return; }
+  const msg = 'Raw records from server: ' + d.rawCount + '\n'
+    + 'Records after local filter: ' + d.afterFilterCount + '\n'
+    + 'Server error (if any): ' + (d.error || 'none') + '\n'
+    + 'Current orders array length right now: ' + orders.length + '\n'
+    + 'Orders panel container exists: ' + (!!document.getElementById('orders-list')) + '\n\n'
+    + 'First raw record from server:\n' + (d.raw && d.raw.records && d.raw.records[0] ? JSON.stringify(d.raw.records[0]) : '(none)');
+  alert(msg);
 }
 function renderOrdersPending(){
   const box=document.getElementById('orders-pending-list'); if(!box) return;
