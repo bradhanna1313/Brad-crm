@@ -415,7 +415,7 @@ body.field-mode .nav-advanced{display:none !important}
 <div id="setup-screen">
   <div class="setup-card">
     <div class="setup-title">BRAD HANNA CRM</div>
-    <div class="setup-sub">v3 — Build: Jul 15q (cleanup safety checks)</div>
+    <div class="setup-sub">v3 — Build: Jul 15s (PO and contact fields)</div>
     <div class="setup-hint">
       <strong>Step 1:</strong> Create a new Google Spreadsheet<br>
       <strong>Step 2:</strong> Extensions → Apps Script → paste <code>google-apps-script-v3.js</code><br>
@@ -531,7 +531,7 @@ body.field-mode .nav-advanced{display:none !important}
 
     <!-- ══ DASHBOARD ══ -->
     <div class="panel active" id="panel-dashboard">
-      <div style="font-family:var(--fm);font-size:9px;color:var(--muted2);text-align:right;margin-bottom:4px">Build: Jul 15q · cleanup safety checks</div>
+      <div style="font-family:var(--fm);font-size:9px;color:var(--muted2);text-align:right;margin-bottom:4px">Build: Jul 15s · PO and contact fields</div>
       <!-- QUICK ACTIONS -->
       <div style="margin-bottom:20px">
         <div style="font-family:var(--fh);font-size:13px;letter-spacing:2px;color:var(--muted2);margin-bottom:10px">QUICK ADD</div>
@@ -1701,6 +1701,10 @@ body.field-mode .nav-advanced{display:none !important}
       <div style="display:flex;gap:8px">
         <div class="form-group" style="flex:1;margin-bottom:10px"><label>Date</label><input type="date" id="order-date"></div>
         <div class="form-group" style="flex:1;margin-bottom:10px"><label>Value (optional)</label><input type="text" id="order-value" placeholder="$ amount"></div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <div class="form-group" style="flex:1;margin-bottom:10px"><label>PO # (optional)</label><input type="text" id="order-po" placeholder="PO number"></div>
+        <div class="form-group" style="flex:1;margin-bottom:10px"><label>Contact (optional)</label><input type="text" id="order-contact" placeholder="Who placed/receives it"></div>
       </div>
       <div class="form-group" style="margin-bottom:10px">
         <label>Job Site (optional)</label>
@@ -6449,6 +6453,8 @@ async function saveOrder(){
   const item=document.getElementById('order-item').value.trim();
   const value=document.getElementById('order-value').value.trim();
   const notes=document.getElementById('order-notes').value.trim();
+  const po=document.getElementById('order-po').value.trim();
+  const contact=document.getElementById('order-contact').value.trim();
   let siteId=document.getElementById('order-siteId').value;
   if(!clientId){ toast('Pick a customer', true); return; }
   if(!item){ toast('Enter what was ordered', true); return; }
@@ -6472,7 +6478,7 @@ async function saveOrder(){
   const editId=document.getElementById('order-edit-id').value;
   if(editId){
     const existing=(orders||[]).find(o=>o.id==editId);
-    const record={ ...existing, clientId, date, item, value, notes, siteId };
+    const record={ ...existing, clientId, date, item, value, notes, siteId, po, contact };
     const res=await api({ action:'update', type:'orders', record });
     if(res&&res.success){
       Object.assign(existing, record);
@@ -6483,7 +6489,7 @@ async function saveOrder(){
     } else toast('Could not update order', true);
     return;
   }
-  const record={ clientId, date, item, value, notes, siteId, status:'Pending' };
+  const record={ clientId, date, item, value, notes, siteId, po, contact, status:'Pending' };
   const res=await api({ action:'add', type:'orders', record });
   if(res&&res.success){
     toast('Order logged \u2713');
@@ -6502,6 +6508,8 @@ function openEditOrder(id){
     document.getElementById('order-item').value=o.item||'';
     document.getElementById('order-value').value=o.value||'';
     document.getElementById('order-notes').value=o.notes||'';
+    document.getElementById('order-po').value=o.po||'';
+    document.getElementById('order-contact').value=o.contact||'';
     const siteSel=document.getElementById('order-siteId');
     if(siteSel) siteSel.value=o.siteId||'';
     document.getElementById('order-newsite-fields').style.display='none';
@@ -6530,15 +6538,20 @@ async function reopenOrder(id){
 function sendOrderUpdate(id){
   const o=(orders||[]).find(x=>x.id==id); if(!o) return;
   const c=clients.find(x=>x.id==o.clientId);
-  const deliveryTime=prompt('Delivery time to tell '+(c?(c.company||c.name):'the customer')+':', 'Tomorrow morning, 8-10am');
+  const s=jobsites.find(x=>x.id==o.siteId);
+  const siteText = s ? (s.siteName + (s.address ? (' \u2014 ' + [s.address, s.city].filter(Boolean).join(', ')) : '')) : 'Not specified';
+  const displayName = (o.contact && o.contact.trim()) ? o.contact.trim() : (c?(c.name||c.company):'there');
+  const deliveryTime=prompt('Delivery time to tell '+(o.contact||(c?(c.company||c.name):'the customer'))+':', 'Tomorrow morning, 8-10am');
   if(deliveryTime===null || !deliveryTime.trim()) return;
   const body=fillTemplate('deliveryUpdate', {
-    contact: c?(c.name||c.company):'there',
+    contact: displayName,
     company: c?(c.company||''):'',
     item: o.item||'your order',
+    site: siteText,
+    po: o.po||'N/A',
     deliveryTime: deliveryTime.trim()
   });
-  const recipientName = c ? c.name : '';
+  const recipientName = displayName;
   const recipientContact = c ? (c.phone || c.email || '') : '';
   showMessage('Delivery Update', body, recipientName, recipientContact);
 }
@@ -6589,6 +6602,7 @@ function renderOrdersPending(){
         <div style="flex:1;min-width:0">
           <div style="font-weight:600;font-size:13px" ${c?`onclick="openProfile('${c.id}')" style="cursor:pointer"`:''}>${name}</div>
           <div style="font-family:var(--fm);font-size:11px;color:${urgent?'var(--red)':'var(--muted2)'};margin-top:2px">${(o.item||'').replace(/</g,'&lt;')} &middot; ordered ${mdy(o.date)} (${days}d ago)</div>
+          ${(o.po||o.contact)?`<div style="font-family:var(--fm);font-size:10px;color:var(--muted2);margin-top:2px">${o.po?'PO# '+o.po.replace(/</g,'&lt;'):''}${o.po&&o.contact?' &middot; ':''}${o.contact?'Contact: '+o.contact.replace(/</g,'&lt;'):''}</div>`:''}
         </div>
         <div style="display:flex;gap:5px"><button class="btn-small" style="color:var(--yellow);border-color:var(--yellow)" onclick="openEditOrder('${o.id}')">✎</button><button class="btn-small" style="color:var(--blue);border-color:var(--blue)" onclick="sendOrderUpdate('${o.id}')">📩 Update</button><button class="btn-small" style="color:var(--green);border-color:var(--green)" onclick="markOrderDelivered('${o.id}')">✓ Delivered</button></div>
       </div>
@@ -6629,6 +6643,7 @@ function renderOrders(){
         <div style="flex:1;min-width:0">
           <div style="font-weight:600;font-size:13px" ${c?`onclick="openProfile('${c.id}')" style="cursor:pointer"`:''}>${name} <span style="font-family:var(--fm);font-size:9px;color:${isDelivered?'var(--green)':'var(--yellow)'};border:1px solid ${isDelivered?'var(--green)':'var(--yellow)'};border-radius:3px;padding:1px 5px;margin-left:4px">${isDelivered?'✓ DELIVERED':'PENDING'}</span></div>
           <div style="font-family:var(--fm);font-size:11px;color:var(--muted2);margin-top:2px">${mdy(o.date)} &middot; ${(o.item||'').replace(/</g,'&lt;')}${o.value?' &middot; '+fmt(o.value):''}</div>
+          ${(o.po||o.contact)?`<div style="font-family:var(--fm);font-size:10px;color:var(--muted2);margin-top:2px">${o.po?'PO# '+o.po.replace(/</g,'&lt;'):''}${o.po&&o.contact?' &middot; ':''}${o.contact?'Contact: '+o.contact.replace(/</g,'&lt;'):''}</div>`:''}
           ${o.notes?`<div style="font-family:var(--fm);font-size:10px;color:var(--muted2);margin-top:3px">${o.notes.replace(/</g,'&lt;')}</div>`:''}
         </div>
         <div style="display:flex;gap:5px">
@@ -8032,8 +8047,11 @@ Brad Hanna`
   },
   deliveryUpdate: {
     label: 'Delivery Update',
-    text: `Hi {contact}, wanted to give you an update on your order — {item}.
+    text: `Hi {contact}, wanted to give you an update on your order.
 
+Equipment: {item}
+Job Site: {site}
+PO #: {po}
 Delivery: {deliveryTime}
 
 Let me know if anything changes on your end or if you need anything adjusted.
@@ -9636,7 +9654,7 @@ function showPanel(id) {
   if (id === 'worktypes') renderWorkTypes();
   if (id === 'templates') renderTemplates();
   if (id === 'orders') renderOrders();
-  if (id === 'add-order'){ const d=document.getElementById('order-date'); if(d) d.value=today(); const v=document.getElementById('order-value'); if(v) v.value=''; const it=document.getElementById('order-item'); if(it) it.value=''; const n=document.getElementById('order-notes'); if(n) n.value=''; const c=document.getElementById('order-clientId'); if(c) c.value=''; const eid=document.getElementById('order-edit-id'); if(eid) eid.value=''; const ft=document.getElementById('order-form-title'); if(ft) ft.textContent='\ud83d\udce6 LOG ORDER'; }
+  if (id === 'add-order'){ const d=document.getElementById('order-date'); if(d) d.value=today(); const v=document.getElementById('order-value'); if(v) v.value=''; const it=document.getElementById('order-item'); if(it) it.value=''; const n=document.getElementById('order-notes'); if(n) n.value=''; const c=document.getElementById('order-clientId'); if(c) c.value=''; const eid=document.getElementById('order-edit-id'); if(eid) eid.value=''; const ft=document.getElementById('order-form-title'); if(ft) ft.textContent='\ud83d\udce6 LOG ORDER'; const po=document.getElementById('order-po'); if(po) po.value=''; const oc=document.getElementById('order-contact'); if(oc) oc.value=''; }
   if (id === 'digest-setup'){ const a=document.getElementById('aiscan-status'); if(a) a.textContent=_aiScanEnabled()?'ON':'OFF'; const t=document.getElementById('api-token-input'); if(t) t.value=API_TOKEN; }
   if (id === 'todayroute') { const d=document.getElementById('tr-day'); if(d && !d._init){ d._init=true; const wd=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date().getDay()]; d.value=(wd==='Saturday'||wd==='Sunday')?'Monday':wd; } renderTodayRoute(); }
   if (id === 'branch-contacts') renderBranchContacts();
