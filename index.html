@@ -415,7 +415,7 @@ body.field-mode .nav-advanced{display:none !important}
 <div id="setup-screen">
   <div class="setup-card">
     <div class="setup-title">BRAD HANNA CRM</div>
-    <div class="setup-sub">v3 — Build: Jul 15s (PO and contact fields)</div>
+    <div class="setup-sub">v3 — Build: Jul 15t (service call updates)</div>
     <div class="setup-hint">
       <strong>Step 1:</strong> Create a new Google Spreadsheet<br>
       <strong>Step 2:</strong> Extensions → Apps Script → paste <code>google-apps-script-v3.js</code><br>
@@ -531,7 +531,7 @@ body.field-mode .nav-advanced{display:none !important}
 
     <!-- ══ DASHBOARD ══ -->
     <div class="panel active" id="panel-dashboard">
-      <div style="font-family:var(--fm);font-size:9px;color:var(--muted2);text-align:right;margin-bottom:4px">Build: Jul 15s · PO and contact fields</div>
+      <div style="font-family:var(--fm);font-size:9px;color:var(--muted2);text-align:right;margin-bottom:4px">Build: Jul 15t · service call updates</div>
       <!-- QUICK ACTIONS -->
       <div style="margin-bottom:20px">
         <div style="font-family:var(--fh);font-size:13px;letter-spacing:2px;color:var(--muted2);margin-bottom:10px">QUICK ADD</div>
@@ -8045,6 +8045,19 @@ Could you let me know when we might expect payment? Happy to help if there's any
 Appreciate you,
 Brad Hanna`
   },
+  serviceUpdate: {
+    label: 'Service Update',
+    text: `Hi {contact}, wanted to give you an update on {equip} at {site}.
+
+{details}
+
+{statusUpdate}
+
+Let me know if you have any questions.
+
+Brad Hanna
+405-203-2125`
+  },
   deliveryUpdate: {
     label: 'Delivery Update',
     text: `Hi {contact}, wanted to give you an update on your order.
@@ -8280,6 +8293,27 @@ async function deleteServiceLog(id) {
   if (res && res.success) { toast('Removed ✓'); await syncAll(); }
 }
 
+function sendServiceUpdate(id){
+  const l=(serviceLogs||[]).find(x=>x.id==id); if(!l) return;
+  const isService = l.type === 'Service Call';
+  const c = _arFindClient(l.customer||'');
+  const details = isService
+    ? ('Issue: ' + (l.issue||'not specified'))
+    : ('Pickup: ' + (l.pickupDate?mdy(l.pickupDate):'TBD') + (l.pickupTime?' at '+(()=>{const [hh,mm]=l.pickupTime.split(':').map(Number);const ap=hh>=12?'PM':'AM';const h12=((hh%12)||12);return h12+':'+('0'+mm).slice(-2)+' '+ap;})():'') + (l.reason?' — '+l.reason:''));
+  const statusUpdate=prompt('Status update for '+(l.contact||l.customer||'the customer')+':', isService ? 'Technician is on the way' : 'Equipment has been picked up');
+  if(statusUpdate===null) return;
+  const body=fillTemplate('serviceUpdate', {
+    contact: l.contact || (c?(c.name||c.company):'there'),
+    company: c?(c.company||''):'',
+    equip: l.equip||'the equipment',
+    site: l.siteName||'the job site',
+    details,
+    statusUpdate: statusUpdate.trim()
+  });
+  const recipientName = l.contact || (c?c.name:'') || '';
+  const recipientContact = c ? (c.phone || c.email || '') : '';
+  showMessage('Service Update', body, recipientName, recipientContact);
+}
 function renderServiceLog() {
   const svcLogs = serviceLogs.filter(l => l.type === 'Service Call');
   const coLogs  = serviceLogs.filter(l => l.type === 'Call Off');
@@ -8317,6 +8351,7 @@ function renderServiceLog() {
           <span style="font-family:var(--fm);font-size:10px;padding:2px 8px;border-radius:2px;background:${resolved?'rgba(46,204,113,.15)':'rgba(231,76,60,.15)'};color:${resolved?'var(--green)':color}">${l.status}</span>
           ${l.priority==='URGENT'?'<span style="font-family:var(--fm);font-size:9px;color:var(--red);font-weight:700">🔴 URGENT</span>':''}
           <div style="display:flex;gap:5px;margin-top:4px">
+            <button class="btn-small" style="color:var(--blue);border-color:var(--blue)" onclick="sendServiceUpdate('${l.id}')">📩 Update</button>
             ${!resolved?`<button class="btn-small" style="color:var(--green);border-color:var(--green)" onclick="resolveServiceLog('${l.id}')">✓ Resolved</button>`:''}
             <button class="btn-small" onclick="openEditServiceLog('${l.id}')">Edit</button>
             <button class="btn-danger" onclick="deleteServiceLog('${l.id}')">✕</button>
