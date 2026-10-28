@@ -416,7 +416,7 @@ body.field-mode .nav-advanced{display:none !important}
 <div id="setup-screen">
   <div class="setup-card">
     <div class="setup-title">BRAD HANNA CRM</div>
-    <div class="setup-sub">v3 — Build: Jul 16a (checkbox layout fix)</div>
+    <div class="setup-sub">v3 — Build: Jul 16e (quiet customer alerts)</div>
     <div class="setup-hint">
       <strong>Step 1:</strong> Create a new Google Spreadsheet<br>
       <strong>Step 2:</strong> Extensions → Apps Script → paste <code>google-apps-script-v3.js</code><br>
@@ -532,7 +532,7 @@ body.field-mode .nav-advanced{display:none !important}
 
     <!-- ══ DASHBOARD ══ -->
     <div class="panel active" id="panel-dashboard">
-      <div style="font-family:var(--fm);font-size:9px;color:var(--muted2);text-align:right;margin-bottom:4px">Build: Jul 16a · checkbox layout fix</div>
+      <div style="font-family:var(--fm);font-size:9px;color:var(--muted2);text-align:right;margin-bottom:4px">Build: Jul 16e · quiet customer alerts</div>
       <!-- QUICK ACTIONS -->
       <div style="margin-bottom:20px">
         <div style="font-family:var(--fh);font-size:13px;letter-spacing:2px;color:var(--muted2);margin-bottom:10px">QUICK ADD</div>
@@ -617,6 +617,18 @@ body.field-mode .nav-advanced{display:none !important}
             <div class="empty-state"><div class="empty-icon">⟳</div>Loading...</div>
           </div>
         </div>
+      </div>
+
+      <!-- QUOTES NEEDING FOLLOW-UP -->
+      <div style="margin-top:18px">
+        <div class="col-title" style="color:var(--yellow)">&#128176; QUOTES NEEDING FOLLOW-UP</div>
+        <div id="dash-quotes-due"></div>
+      </div>
+
+      <!-- QUIET CUSTOMERS -->
+      <div style="margin-top:18px">
+        <div class="col-title" style="color:var(--red)">&#128263; QUIET CUSTOMERS</div>
+        <div id="dash-quiet"></div>
       </div>
 
       <!-- TIME ON SITE TODAY -->
@@ -754,7 +766,7 @@ body.field-mode .nav-advanced{display:none !important}
         </div>
       </div>
       <div class="filters">
-        <button class="filter-btn active" onclick="filterS('all',this)">All</button>
+        <button class="filter-btn active" onclick="filterS('all',this)">All Open</button>
         <button class="filter-btn" onclick="filterS('Active',this)">🟢 Active</button>
         <button class="filter-btn" onclick="filterS('Pending',this)">🟡 Pending</button>
         <button class="filter-btn" onclick="filterS('Complete',this)">✓ Complete</button>
@@ -1351,6 +1363,19 @@ body.field-mode .nav-advanced{display:none !important}
             <li>(Optional) Add <b>ANTHROPIC_MODEL</b> to override the default vision model</li>
             <li>Redeploy Code.gs as a New version</li>
             <li>Tap the Status button above to flip it ON</li>
+          </ol>
+        </details>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px;margin-top:14px">
+        <div style="font-weight:700;font-size:13px;color:var(--green);margin-bottom:6px">&#128190; SHEET BACKUPS</div>
+        <div id="backup-status" style="font-family:var(--fm);font-size:11px;color:var(--muted2);margin-bottom:10px">Checking&hellip;</div>
+        <button class="btn-small" style="color:var(--green);border-color:var(--green)" onclick="backupNow()">&#128190; Back Up Now</button>
+        <details style="margin-top:10px"><summary style="font-family:var(--fm);font-size:11px;color:var(--blue);cursor:pointer">How to turn on the weekly automatic backup</summary>
+          <ol style="font-family:var(--fm);font-size:11px;color:var(--muted2);margin:8px 0 0 16px;line-height:1.7">
+            <li>Replace Code.gs with the new version and Save</li>
+            <li>In Apps Script, pick <b>setupWeeklyBackup</b> from the function dropdown and tap Run. Approve the Google permission prompts (Drive access) &mdash; it makes the first backup and schedules one every Sunday night</li>
+            <li>Deploy &rarr; Manage deployments &rarr; pencil &rarr; New version &rarr; Deploy</li>
+            <li>Backups land in a Google Drive folder called <b>Site Boss Backups</b> (newest 12 kept)</li>
           </ol>
         </details>
       </div>
@@ -3201,13 +3226,42 @@ function trStopsForDay(day){
     return z(homeZone)===wanted;        // normal: on its home day
   };
   const moved = (kind,id) => !!trOverrideFor(kind,id);
-  const sites=jobsites.filter(s=>onDay('site',s.id,s.zone))
+  const sites=jobsites.filter(s=>z(s.status)!=='complete' && z(s.status)!=='lost' && onDay('site',s.id,s.zone))
     .map(s=>({kind:'site',id:s.id,name:s.siteName,sub:(siteCust(s.clientId)||{}).company||s.client||'',address:[s.address,s.city,[s.state,s.zip].filter(Boolean).join(' ')].filter(Boolean).join(', '),moved:moved('site',s.id)}));
   const custs=clients.filter(c=>onDay('customer',c.id,c.zone))
     .map(c=>({kind:'customer',id:c.id,name:c.company||c.name,sub:c.name||'',address:[c.address,c.city,[c.state,c.zip].filter(Boolean).join(' ')].filter(Boolean).join(', '),moved:moved('customer',c.id)}));
   const prosp=(prospects||[]).filter(p=>onDay('prospect',p.id,p.zone))
     .map(p=>({kind:'prospect',id:p.id,name:p.company||p.name,sub:p.name||'',address:[p.address,p.city].filter(Boolean).join(', '),moved:moved('prospect',p.id)}));
   return sites.concat(custs, prosp);
+}
+function trLastVisit(kind,id){
+  // Most recent check-in / contact date for a stop (ISO yyyy-mm-dd), or ''
+  const iso=d=>String(d||'').split('T')[0];
+  const ok=d=>/^\d{4}-\d{2}-\d{2}$/.test(d);
+  const ds=[];
+  try{
+    if(kind==='site'){ const e=jobsites.find(x=>x.id==id); if(e){ ds.push(iso(e.lastCheckIn)); parseVisitLog(e.visitLog).forEach(l=>ds.push(iso(l.date))); } }
+    else if(kind==='customer'){ const e=clients.find(x=>x.id==id); if(e){ ds.push(iso(e.lastContact)); parseCustLog(e.visitLog).forEach(l=>ds.push(iso(l.date))); } }
+    else { const e=(prospects||[]).find(x=>x.id==id); if(e){ ds.push(iso(e.lastFollowUp)); String(e.notes||'').split('\n').forEach(line=>{ const m=line.match(/^\[(\d{4}-\d{2}-\d{2})\]/); if(m) ds.push(m[1]); }); } }
+  }catch(err){}
+  const good=ds.filter(ok).sort();
+  return good.length?good[good.length-1]:'';
+}
+function trLastHtml(kind,id){
+  const last=trLastVisit(kind,id);
+  if(!last) return '<div style="font-family:var(--fm);font-size:10px;color:var(--red)">&#128336; Never checked in</div>';
+  const now=new Date(); now.setHours(12,0,0,0);
+  const d=new Date(last+'T12:00:00');
+  const days=Math.round((now-d)/86400000);
+  const monday=new Date(now); monday.setDate(now.getDate()-((now.getDay()+6)%7));
+  const mondayISO=monday.getFullYear()+'-'+('0'+(monday.getMonth()+1)).slice(-2)+'-'+('0'+monday.getDate()).slice(-2);
+  const nice=d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  const ago=days<=0?'today':days===1?'yesterday':days+' days ago';
+  let col='var(--green)', tag='';
+  if(last>=mondayISO){ tag=' &middot; <b>seen this week</b>'; }
+  else if(days<14){ col='var(--yellow)'; }
+  else { col='var(--red)'; }
+  return '<div style="font-family:var(--fm);font-size:10px;color:'+col+'">&#128336; Last check-in: '+nice+' ('+ago+')'+tag+'</div>';
 }
 function renderTodayRoute(){
   const day=(document.getElementById('tr-day')||{}).value||'Monday';
@@ -3236,12 +3290,14 @@ function renderTodayRoute(){
           <div style="font-weight:600;font-size:13px;${isDone?'text-decoration:line-through':''}">${s.name} ${badge}${s.moved?' <span style="font-family:var(--fm);font-size:9px;color:var(--accent)">&#8631; this wk</span>':''}</div>
           ${s.sub?`<div style="font-family:var(--fm);font-size:10px;color:var(--muted2)">${s.sub}</div>`:''}
           ${s.address?`<div style="font-family:var(--fm);font-size:10px;color:var(--muted2)">${s.address}</div>`:''}
+          ${trLastHtml(s.kind,s.id)}
         </div>
       </div>
       <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:7px;padding-left:32px">
         ${s.address?`<button class="btn-small" style="color:var(--blue);border-color:var(--blue)" onclick="trNav('${s.kind}','${s.id}','${day}')">🧭 Navigate</button>`:''}
         <button class="btn-small" style="color:var(--green);border-color:var(--green)" onclick="trCheckIn('${s.kind}','${s.id}','${day}')">✓ Check In</button>
         ${s.kind==='site'?`<button class="btn-small" style="color:var(--green);border-color:var(--green)" onclick="openSubCheckIn('${s.id}')">&#128119; Check In Subs</button>`:''}
+        ${s.kind==='site'?`<button class="btn-small" style="color:var(--muted2);border-color:var(--muted2)" onclick="trCompleteJob('${s.id}')">&#10003; Job Complete</button>`:''}
         <button class="btn-small" style="color:var(--accent);border-color:var(--accent)" onclick="trMoveToDay('${s.kind}','${s.id}')">↪ Move Day</button>
         <button class="btn-small" style="color:var(--blue);border-color:var(--blue)" onclick="trEditStop('${s.kind}','${s.id}')">✎ Edit Card</button>
         ${(()=>{const av=getActiveVisit();const here=av&&av.kind===s.kind&&String(av.id)===String(s.id);return here?`<button class="btn-small" style="color:#fff;background:var(--green);border-color:var(--green)" onclick="stopVisitTimer()">⏱ Clock Out</button>`:`<button class="btn-small" style="color:var(--green);border-color:var(--green)" onclick="startVisitTimer('${s.kind}','${s.id}','${(s.name||'').replace(/'/g,'')}')">⏱ Clock In</button>`;})()}
@@ -3364,6 +3420,13 @@ function downloadWeekRouteCSV(){
   a.href=url; a.download='Weekly-Route-'+_wrLocalISO(w.monday)+'.csv';
   a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000);
   toast('Weekly route CSV downloaded \u2713');
+}
+async function trCompleteJob(id){
+  const s=jobsites.find(x=>x.id==id); if(!s) return;
+  if(!confirm('Mark "'+(s.siteName||'this job')+'" as COMPLETE?\n\nIt comes off your routes and the main Job Sites list. You can still find it under the \u2713 Complete filter and reopen it by changing its status.')) return;
+  const res=await api({action:'update',type:'jobsites',record:{...s,status:'Complete'}});
+  if(res&&res.success){ s.status='Complete'; toast('Job marked complete \u2713'); await syncAll(); renderTodayRoute(); if(typeof renderSiteTable==='function') renderSiteTable(); }
+  else toast('Could not update', true);
 }
 function trToggleVisited(kind,id,day){
   const key=kind+':'+id;
@@ -4740,6 +4803,8 @@ function renderAll() {
     : '<div class="empty-state"><div class="empty-icon">🏗</div>No active sites yet.</div>';
   renderJobProgress();
   renderTimeToday();
+  renderDashQuotes();
+  renderQuietCustomers();
 
   // Re-engagement
   document.getElementById('re-t2').innerHTML = t2.length ? t2.map(c => reengCard(c,2)).join('') : '<div class="empty-state">None right now.</div>';
@@ -5113,6 +5178,7 @@ function dateAdd(d,days){const dt=new Date(d+'T00:00:00');dt.setDate(dt.getDate(
 function renderSiteTable() {
   let data = [...jobsites];
   if (sFilter !== 'all') data = data.filter(s => s.status === sFilter);
+  else data = data.filter(s => s.status !== 'Complete' && s.status !== 'Lost');   // finished jobs live under the Complete / Lost filters
   if (sSearch) { const q = sSearch.toLowerCase(); data = data.filter(s => (s.siteName||'').toLowerCase().includes(q)||(s.client||'').toLowerCase().includes(q)); }
 
   const tbody = document.getElementById('s-tbody');
@@ -8305,6 +8371,33 @@ Let me know if you have any questions.
 Brad Hanna
 405-203-2125`
   },
+  offRentCheck: {
+    label: 'Equipment Coming Off Rent',
+    text: `Hi {contact}, quick heads up — your {equip}{unit} at {site} is scheduled to come off rent on {date}.
+
+Want to extend it, swap it for something else, or set up a pickup? Just let me know and I'll take care of it.
+
+Brad Hanna
+405-203-2125`
+  },
+  quoteFollowUp: {
+    label: 'Quote Follow-Up',
+    text: `Hi {contact}, just following up on the quote I sent for {project}{amount}.
+
+Do you have any questions, or want anything adjusted? I can tweak equipment, timing, or pricing to make it work — just let me know where you're at and I'll take care of it.
+
+Brad Hanna
+405-203-2125`
+  },
+  quietCustomer: {
+    label: 'Quiet Customer Check-In',
+    text: `Hey {contact}, it's been a little while since we've worked together and I wanted to check in.
+
+Anything coming up — new jobs, equipment you need lined up, or something we could be doing better? I want to make sure you're taken care of.
+
+Brad Hanna
+405-203-2125`
+  },
   deliveryUpdate: {
     label: 'Delivery Update',
     text: `Hi {contact}, wanted to give you an update on your order.
@@ -8952,6 +9045,237 @@ async function markOffRent(id) {
   if (res && res.success) { toast('Marked off rent ✓'); await syncAll(); }
 }
 
+function _eqCustomer(eq){
+  let c=clients.find(x=>x.id==eq.clientId);
+  const nm=(eq.customerName||'').toLowerCase();
+  if(!c && nm) c=clients.find(x=>x.company && (x.company.toLowerCase().includes(nm)||nm.includes(x.company.toLowerCase())));
+  return c||null;
+}
+function eqOffRentMsg(id, mode){
+  const eq=equipment.find(e=>e.id==id); if(!eq) return;
+  const c=_eqCustomer(eq);
+  const s0=jobsites.find(x=>x.id==eq.siteId);
+  const looksPhone=v=>/^[\d\s().+-]{7,}$/.test(String(v||'').trim());
+  let name=(c&&c.name)||(!looksPhone(eq.contact)?eq.contact:'')||'';
+  const first=String(name).trim().split(/\s+/)[0]||'there';
+  const body=fillTemplate('offRentCheck',{
+    contact:first, equip:eq.equip||eq.equipClass||'equipment',
+    unit:eq.unitNum?' (Unit #'+eq.unitNum+')':'', site:eq.siteName||(s0?s0.siteName:'the job site'),
+    date:mdy(String(eq.end||'').split('T')[0])
+  });
+  let to='';
+  if(mode==='email') to=(c&&c.email)||'';
+  else to=(c&&c.phone)||(looksPhone(eq.contact)?eq.contact:'');
+  if(!to) toast('No '+(mode==='email'?'email':'phone')+' on file — type one in', true);
+  showMessage('Equipment coming off rent', body, name, to);
+}
+async function eqExtend(id){
+  const eq=equipment.find(e=>e.id==id); if(!eq) return;
+  const cur=mdy(String(eq.end||'').split('T')[0]);
+  const d=prompt('New off-rent date? (MM-DD-YYYY)', cur);
+  if(d===null) return;
+  if(!/^\s*(\d{1,2}[\/-]\d{1,2}([\/-]\d{4})?|\d{4}-\d{1,2}-\d{1,2})\s*$/.test(d)){ toast('Date not recognized \u2014 use MM-DD-YYYY', true); return; }
+  const iso=normDate(d);
+  const res=await api({action:'update',type:'equipment',record:{...eq,end:iso}});
+  if(res&&res.success){ toast('Extended to '+mdy(iso)+' ✓'); await syncAll(); } else toast('Could not update', true);
+}
+// ── Quiet customers (stopped ordering vs. their own pattern) ──
+function quietCustomerList(){
+  const num=v=>parseFloat(String(v||'').replace(/[^0-9.]/g,''))||0;
+  const DAY=86400000;
+  const nowMs=Date.now();
+  const td=today();
+  const byClient={};
+  (orders||[]).forEach(o=>{
+    const t=orderDateVal(o.date); if(!t) return;
+    (byClient[String(o.clientId)]=byClient[String(o.clientId)]||[]).push({t:t,v:num(o.value)});
+  });
+  const onRentNow=c=>(equipment||[]).some(e=>(e.status==='On Rent'||e.status==='Pending Pickup') && (String(e.clientId)===String(c.id) || (e.customerName && c.company && e.customerName.toLowerCase()===String(c.company).toLowerCase())));
+  const out=[]; let hiddenRecent=0;
+  (clients||[]).forEach(c=>{
+    const list=byClient[String(c.id)]; if(!list||list.length<2) return;
+    list.sort((a,b)=>a.t-b.t);
+    const gaps=[]; for(let i=1;i<list.length;i++) gaps.push((list[i].t-list[i-1].t)/DAY);
+    const avgGap=Math.max(14, gaps.reduce((a,b)=>a+b,0)/gaps.length);
+    const sinceLast=Math.floor((nowMs-list[list.length-1].t)/DAY);
+    if(sinceLast <= Math.max(45, Math.round(avgGap*1.75))) return;
+    if(onRentNow(c)) return;
+    const snooze=String(c.quietSnoozeUntil||'').split('T')[0];
+    if(snooze && snooze>=td) return;
+    const lc=String(c.lastContact||'').split('T')[0];
+    const lcDays=lc?Math.floor((nowMs-new Date(lc+'T12:00:00').getTime())/DAY):null;
+    if(lcDays!==null && lcDays<=14){ hiddenRecent++; return; }
+    out.push({c:c, last:list[list.length-1].t, sinceLast:sinceLast, avgGap:Math.round(avgGap), orders:list.length, total:list.reduce((a,b)=>a+b.v,0), lcDays:lcDays});
+  });
+  out.sort((a,b)=>b.total-a.total || b.sinceLast-a.sinceLast);
+  out.hiddenRecent=hiddenRecent;
+  return out;
+}
+function renderQuietCustomers(){
+  const box=document.getElementById('dash-quiet'); if(!box) return;
+  let list=[]; try{ list=quietCustomerList(); }catch(e){ console.error(e); }
+  if(!list.length){
+    box.innerHTML='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px;font-family:var(--fm);font-size:12px;color:var(--muted2)">&#9989; No repeat customers have gone quiet'+(list.hiddenRecent?' &middot; '+list.hiddenRecent+' contacted recently':'')+'.<br><span style="font-size:10px">Based on customers with 2+ orders logged in the Orders tab.</span></div>';
+    return;
+  }
+  const money=n=>n?'$'+Math.round(n).toLocaleString():'';
+  const nd=t=>new Date(t).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  box.innerHTML='<div style="font-family:var(--fm);font-size:11px;color:var(--red);margin-bottom:8px">'+list.length+' repeat customer'+(list.length===1?'':'s')+' slower than their usual pattern'+(list.hiddenRecent?' &middot; '+list.hiddenRecent+' contacted recently':'')+'</div>'
+  +list.slice(0,8).map(i=>{
+    const c=i.c; const k=c.id;
+    return `<div style="background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--red);border-radius:6px;padding:10px 12px;margin-bottom:6px">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:13px">${_esc(c.company||c.name)}</div>
+          <div style="font-family:var(--fm);font-size:10px;color:var(--muted2)">Last order ${nd(i.last)} &middot; usually every ~${i.avgGap} days &middot; ${i.orders} orders${i.total?' &middot; '+money(i.total):''}</div>
+          <div style="font-family:var(--fm);font-size:10px;color:var(--muted2)">${i.lcDays===null?'No contact logged':'Last contact '+i.lcDays+' day'+(i.lcDays===1?'':'s')+' ago'}</div>
+        </div>
+        <div style="font-family:var(--fh);font-size:20px;color:var(--red)">${i.sinceLast}d</div>
+      </div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:8px">
+        <button class="btn-small" style="color:var(--blue);border-color:var(--blue)" onclick="qcMessage('${k}','text')">&#128241; Text</button>
+        <button class="btn-small" style="color:var(--blue);border-color:var(--blue)" onclick="qcMessage('${k}','email')">&#9993; Email</button>
+        <button class="btn-small" style="color:var(--accent);border-color:var(--accent)" onclick="qcContacted('${k}')">&#10003; Contacted</button>
+        <button class="btn-small" style="color:var(--muted2);border-color:var(--muted2)" onclick="qcSnooze('${k}')">&#128164; Snooze 30d</button>
+        <button class="btn-small" style="color:var(--green);border-color:var(--green)" onclick="openProfile('${k}')">&#128100; Profile</button>
+      </div>
+    </div>`;
+  }).join('')+(list.length>8?'<div style="font-family:var(--fm);font-size:10px;color:var(--muted2)">+'+(list.length-8)+' more</div>':'');
+}
+function qcMessage(id,mode){
+  const c=clients.find(x=>x.id==id); if(!c) return;
+  const first=String(c.name||'').trim().split(/\s+/)[0]||'there';
+  const body=fillTemplate('quietCustomer',{contact:first,company:c.company||''});
+  const to=mode==='email'?(c.email||''):(c.phone||'');
+  if(!to) toast('No '+(mode==='email'?'email':'phone')+' on file — type one in', true);
+  showMessage('Checking in', body, c.name||c.company||'', to);
+}
+async function qcContacted(id){
+  const c=clients.find(x=>x.id==id); if(!c) return;
+  const type=prompt('How did you reach them? (Call, Text, Email, Office Visit, Other)','Call'); if(type===null) return;
+  const note=prompt('What did they say? (optional)'); if(note===null) return;
+  const vdate=today();
+  const log=parseCustLog(c.visitLog); log.push({date:vdate,type:(type||'Other').trim(),note:(note||'').trim()});
+  const res=await api({action:'update',type:'clients',record:{...c,lastContact:maxDate(c.lastContact,vdate),visitLog:JSON.stringify(log)}});
+  if(res&&res.success){ c.lastContact=maxDate(c.lastContact,vdate); c.visitLog=JSON.stringify(log); toast('Contact logged ✓'); await syncAll(); } else toast('Could not save', true);
+}
+async function qcSnooze(id){
+  const c=clients.find(x=>x.id==id); if(!c) return;
+  if(!confirm('Hide '+(c.company||c.name)+' from this list for 30 days?')) return;
+  const until=dateAdd(today(),30);
+  const res=await api({action:'update',type:'clients',record:{...c,quietSnoozeUntil:until}});
+  if(res&&res.success){ c.quietSnoozeUntil=until; toast('Snoozed until '+mdy(until)+' ✓'); await syncAll(); } else toast('Could not save', true);
+}
+
+// ── Quote follow-up timer ──
+function _qIso(d){ return String(d||'').split('T')[0]; }
+function _qDaysSince(iso){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+  const n=new Date(); n.setHours(12,0,0,0);
+  return Math.round((n-new Date(iso+'T12:00:00'))/86400000);
+}
+function _qItems(){
+  const items=[];
+  (custQuotes||[]).forEach(q=>{
+    if((q.status||'Pending')!=='Pending') return;
+    const c=clients.find(x=>x.id==q.clientId);
+    const base=[_qIso(q.date),_qIso(q.lastFollowUp)].filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)).sort().pop()||'';
+    items.push({kind:'quote',id:q.id,name:(c?(c.company||c.name):'(unknown customer)'),project:q.project||'',amount:q.amount||'',quoted:_qIso(q.date),fu:_qIso(q.lastFollowUp),age:_qDaysSince(base),rec:q,contact:c?c.name:'',phone:c?c.phone:'',email:c?c.email:''});
+  });
+  (prospects||[]).forEach(p=>{
+    if(p.stage!=='Quoted') return;
+    const base=[_qIso(p.lastFollowUp),_qIso(p.startDate)].filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)).sort().pop()||'';
+    items.push({kind:'prospect',id:p.id,name:p.company||p.name||'Prospect',project:'',amount:p.value||'',quoted:'',fu:_qIso(p.lastFollowUp),age:_qDaysSince(base),rec:p,contact:p.name||'',phone:p.phone||'',email:p.email||''});
+  });
+  return items;
+}
+function renderDashQuotes(){
+  const box=document.getElementById('dash-quotes-due'); if(!box) return;
+  const all=_qItems();
+  const due=all.filter(i=>i.age===null||i.age>=3).sort((a,b)=>(b.age==null?999:b.age)-(a.age==null?999:a.age));
+  const fresh=all.length-due.length;
+  if(!due.length){
+    box.innerHTML='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px;font-family:var(--fm);font-size:12px;color:var(--muted2)">&#9989; No quotes waiting on a follow-up'+(fresh?' &middot; '+fresh+' sent in the last 2 days':'')+'.</div>';
+    return;
+  }
+  const num=v=>parseFloat(String(v||'').replace(/[^0-9.]/g,''))||0;
+  const total=due.reduce((t,i)=>t+num(i.amount),0);
+  const nice=iso=>iso?mdy(iso):'';
+  box.innerHTML='<div style="font-family:var(--fm);font-size:11px;color:var(--yellow);margin-bottom:8px">'+due.length+' quote'+(due.length===1?'':'s')+' need a follow-up'+(total?' &middot; $'+Math.round(total).toLocaleString()+' open':'')+(fresh?' &middot; '+fresh+' fresh':'')+'</div>'
+  +due.slice(0,12).map(i=>{
+    const old=i.age!=null&&i.age>=7;
+    const col=old?'var(--red)':'var(--yellow)';
+    const badge=i.age==null?'no date':(i.age+'d');
+    const meta=[i.amount,(i.quoted?'quoted '+nice(i.quoted):''),(i.fu?'followed up '+nice(i.fu):'')].filter(Boolean).join(' &middot; ');
+    const k=i.kind+':'+i.id;
+    return `<div style="background:var(--surface2);border:1px solid var(--border);border-left:3px solid ${col};border-radius:6px;padding:10px 12px;margin-bottom:6px">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:13px">${_esc(i.name)}${i.kind==='prospect'?' <span style="font-family:var(--fm);font-size:9px;color:var(--green)">PROSPECT</span>':''}</div>
+          ${i.project?`<div style="font-family:var(--fm);font-size:11px">${_esc(i.project)}</div>`:''}
+          <div style="font-family:var(--fm);font-size:10px;color:var(--muted2)">${meta}</div>
+        </div>
+        <div style="font-family:var(--fh);font-size:20px;color:${col}">${badge}</div>
+      </div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:8px">
+        <button class="btn-small" style="color:var(--blue);border-color:var(--blue)" onclick="qfuMessage('${k}','text')">&#128241; Text</button>
+        <button class="btn-small" style="color:var(--blue);border-color:var(--blue)" onclick="qfuMessage('${k}','email')">&#9993; Email</button>
+        <button class="btn-small" style="color:var(--accent);border-color:var(--accent)" onclick="qfuFollowedUp('${k}')">&#10003; Followed Up</button>
+        <button class="btn-small" style="color:var(--green);border-color:var(--green)" onclick="qfuSetStatus('${k}','Won')">&#9989; Won</button>
+        <button class="btn-small" style="color:var(--red);border-color:var(--red)" onclick="qfuSetStatus('${k}','Lost')">&#10060; Lost</button>
+      </div>
+    </div>`;
+  }).join('')+(due.length>12?'<div style="font-family:var(--fm);font-size:10px;color:var(--muted2)">+'+(due.length-12)+' more</div>':'');
+}
+function _qFind(k){ const [kind,id]=String(k).split(':'); return _qItems().find(i=>i.kind===kind&&String(i.id)===String(id))||null; }
+function qfuMessage(k,mode){
+  const i=_qFind(k); if(!i) return;
+  const first=String(i.contact||'').trim().split(/\s+/)[0]||'there';
+  const amt=i.amount?' ('+(/^\$/.test(String(i.amount).trim())?String(i.amount).trim():'$'+String(i.amount).trim())+')':'';
+  const body=fillTemplate('quoteFollowUp',{contact:first,project:i.project||'your project',amount:amt});
+  const to=mode==='email'?(i.email||''):(i.phone||'');
+  if(!to) toast('No '+(mode==='email'?'email':'phone')+' on file — type one in', true);
+  showMessage('Quote follow-up', body, i.contact||'', to);
+}
+async function qfuFollowedUp(k){
+  const i=_qFind(k); if(!i) return;
+  const note=prompt('What did they say? (optional)'); if(note===null) return;
+  const td=today(); const line='['+td+'] Followed up'+(note.trim()?': '+note.trim():'');
+  let res;
+  if(i.kind==='quote') res=await api({action:'update',type:'custQuotes',record:{...i.rec,lastFollowUp:td,notes:(i.rec.notes?i.rec.notes+'\n':'')+line}});
+  else res=await api({action:'update',type:'prospects',record:{...i.rec,lastFollowUp:td,notes:(i.rec.notes?i.rec.notes+'\n':'')+line}});
+  if(res&&res.success){ toast('Follow-up logged ✓'); await syncAll(); } else toast('Could not save', true);
+}
+async function qfuSetStatus(k,status){
+  const i=_qFind(k); if(!i) return;
+  let extra='';
+  if(status==='Lost'){ const why=prompt('Why was it lost? (price, competitor, timing… optional)'); if(why===null) return; extra=why.trim(); }
+  else if(!confirm('Mark this quote as WON?')) return;
+  const td=today(); const line='['+td+'] '+status+(extra?': '+extra:'');
+  let res;
+  if(i.kind==='quote') res=await api({action:'update',type:'custQuotes',record:{...i.rec,status:status,notes:(i.rec.notes?i.rec.notes+'\n':'')+line}});
+  else res=await api({action:'update',type:'prospects',record:{...i.rec,stage:status,notes:(i.rec.notes?i.rec.notes+'\n':'')+line}});
+  if(res&&res.success){ toast('Marked '+status+' ✓'); await syncAll(); } else toast('Could not save', true);
+}
+
+// ── Sheet backups ──
+async function refreshBackupStatus(){
+  const el=document.getElementById('backup-status'); if(!el) return;
+  try{
+    const r=await api({action:'backupStatus'});
+    if(r&&r.success){
+      const last=r.last?('Last backup: <b style="color:var(--green)">'+new Date(r.last.time).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})+'</b>'):'<span style="color:var(--yellow)">No backup yet</span>';
+      el.innerHTML=last+' &middot; Weekly auto-backup: '+(r.scheduled?'<b style="color:var(--green)">ON</b>':'<b style="color:var(--red)">OFF</b> (see steps below)');
+    } else el.innerHTML='<span style="color:var(--yellow)">Backup status unavailable — update Code.gs first.</span>';
+  }catch(e){ el.textContent='Backup status unavailable.'; }
+}
+async function backupNow(){
+  toast('Backing up…');
+  const r=await api({action:'backupNow'});
+  if(r&&r.success){ toast('Backup saved to Drive ✓'); refreshBackupStatus(); }
+  else alert((r&&r.message)||'Backup failed. Update Code.gs, run setupWeeklyBackup once in Apps Script to approve Drive access, then redeploy a New version.');
+}
+
 function daysUntilOffRent(endStr) {
   if (!endStr) return null;
   const end = new Date(endStr);
@@ -8984,6 +9308,7 @@ function renderEquipment() {
     return `<div class="equip-row ${urgency}">
       <div style="flex:1">
         <div class="equip-name">${eq.equip||eq.equipClass||'Equipment'} ${eq.qty&&eq.qty!=='1'?'(x'+eq.qty+')':''}</div>
+        ${urgency?(()=>{ const dd=daysUntilOffRent(eq.end); const when=dd===null?'':(dd<0?Math.abs(dd)+' day'+(Math.abs(dd)===1?'':'s')+' OVERDUE':dd===0?'TODAY':'in '+dd+' day'+(dd===1?'':'s')); const col=dd!==null&&dd<=2?'var(--red)':'var(--yellow)'; return `<div class="equip-meta" style="color:${col};font-weight:700">&#9200; Off rent ${mdy(String(eq.end||'').split('T')[0])} &mdash; ${when}${eq.rate?' &middot; '+eq.rate:''}</div>`; })():''}
         ${eq.unitNum?`<div class="equip-meta">Unit #${eq.unitNum}</div>`:''}
         ${custName?`<div class="equip-meta">👷 ${custName}</div>`:''}
         ${siteLabel?`<div class="equip-meta">🏗 ${siteLabel}</div>`:''}
@@ -8992,6 +9317,7 @@ function renderEquipment() {
       </div>
       <div style="text-align:right">
         <div style="display:flex;gap:5px;margin-top:6px;justify-content:flex-end;flex-wrap:wrap">
+          ${urgency?`<button class="btn-small" style="color:var(--blue);border-color:var(--blue)" onclick="eqOffRentMsg('${eq.id}','text')">&#128241; Text</button><button class="btn-small" style="color:var(--blue);border-color:var(--blue)" onclick="eqOffRentMsg('${eq.id}','email')">&#9993; Email</button><button class="btn-small" style="color:var(--green);border-color:var(--green)" onclick="eqExtend('${eq.id}')">&#128257; Extended</button>`:''}
           <button class="btn-small" style="color:var(--accent);border-color:var(--accent)" onclick="openEditEquip('${eq.id}')">✎ Edit</button>
           <button class="btn-small" style="color:var(--red);border-color:var(--red)" onclick="openServiceCallFromEquip('${eq.id}')">🔧 Service</button>
           <button class="btn-small" style="color:var(--blue);border-color:var(--blue)" onclick="openCallOffFromEquip('${eq.id}')">📞 Call Off</button>
@@ -9002,9 +9328,12 @@ function renderEquipment() {
     </div>`;
   }
 
-  const alertList = [...overdue, ...expiring];
+  const alertList = [...overdue, ...expiring].sort((a,b)=>daysUntilOffRent(a.end)-daysUntilOffRent(b.end));
   const alertEl = document.getElementById('eq-alert-list');
-  if (alertEl) alertEl.innerHTML = alertList.length ? alertList.map(e => eqCard(e, daysUntilOffRent(e.end)<0?'expired':'expiring')).join('') : '<div class="empty-state">No expiring equipment. ✅</div>';
+  const _rateNum = e => parseFloat((String(e.rate||'')).replace(/[^0-9.]/g,''))||0;
+  const _atRisk = alertList.reduce((t,e)=>t+_rateNum(e),0);
+  const _banner = alertList.length ? `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:10px;font-family:var(--fm);font-size:12px;color:var(--yellow)">&#128222; ${alertList.length} unit${alertList.length===1?'':'s'} coming off rent or overdue${_atRisk?' &middot; <b>$'+Math.round(_atRisk).toLocaleString()+'</b> in rates at risk':''} &mdash; call before they go back.</div>` : '';
+  if (alertEl) alertEl.innerHTML = alertList.length ? _banner + alertList.map(e => eqCard(e, daysUntilOffRent(e.end)<0?'expired':'expiring')).join('') : '<div class="empty-state">No expiring equipment. ✅</div>';
 
   const q = (document.getElementById('eq-search') ? document.getElementById('eq-search').value : '').trim().toLowerCase();
   const matches = e => {
@@ -9937,7 +10266,7 @@ function showPanel(id) {
   if (id === 'templates') renderTemplates();
   if (id === 'orders') renderOrders();
   if (id === 'add-order'){ const d=document.getElementById('order-date'); if(d) d.value=today(); const v=document.getElementById('order-value'); if(v) v.value=''; const it=document.getElementById('order-item'); if(it) it.value=''; const n=document.getElementById('order-notes'); if(n) n.value=''; const c=document.getElementById('order-clientId'); if(c) c.value=''; const eid=document.getElementById('order-edit-id'); if(eid) eid.value=''; const ft=document.getElementById('order-form-title'); if(ft) ft.textContent='\ud83d\udce6 LOG ORDER'; const po=document.getElementById('order-po'); if(po) po.value=''; const oc=document.getElementById('order-contact'); if(oc) oc.value=''; }
-  if (id === 'digest-setup'){ const a=document.getElementById('aiscan-status'); if(a) a.textContent=_aiScanEnabled()?'ON':'OFF'; const t=document.getElementById('api-token-input'); if(t) t.value=API_TOKEN; }
+  if (id === 'digest-setup'){ const a=document.getElementById('aiscan-status'); if(a) a.textContent=_aiScanEnabled()?'ON':'OFF'; const t=document.getElementById('api-token-input'); if(t) t.value=API_TOKEN; refreshBackupStatus(); }
   if (id === 'todayroute') { const d=document.getElementById('tr-day'); if(d && !d._init){ d._init=true; const wd=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date().getDay()]; d.value=(wd==='Saturday'||wd==='Sunday')?'Monday':wd; } renderTodayRoute(); }
   if (id === 'branch-contacts') renderBranchContacts();
   if (id !== 'dashboard' && id !== 'customers' && id !== 'jobsites') closeProfile();
